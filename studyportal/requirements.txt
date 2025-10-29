@@ -1,0 +1,6 @@
+python-dotenv
+
+django
+djangorestframework
+psycopg2-binary
+python-dotenv
