@@ -40,19 +40,31 @@ body {
     margin-bottom: 20px;
   }
 
-  /* Buttons */
-  .btn-primary {
-    background: #0d6efd;
-    color: white;
-    border-radius: 6px;
-    padding: 8px 12px;
-    cursor: pointer;
-    border: none;
-  }
 
-  .btn-primary:hover {
-    background: #0b5ed7;
-  }
+.btn {
+  background: #0d6efd;
+  color: white;
+  border-radius: 6px;
+  padding: 8px 12px;
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #0b5ed7;
+}
+
+.btn-secondary {
+  cursor: not-allowed;
+  opacity: 0.55;        /* dim look */
+  pointer-events: none; /* prevent click */
+}
+
 
   /* Cards */
   .course-card {

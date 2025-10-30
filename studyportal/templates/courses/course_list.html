@@ -4,18 +4,24 @@
 {% endblock title %}
 {% block content %}
     <h2 class="course-header">Courses</h2>
-    <form method="post" class="search-box">
-        {% csrf_token %}
+    <form method="get" class="search-box">
         <input type="text" name="q" placeholder="Search..." value="{{ query }}">
         <input type="text"
                name="category"
                placeholder="Category"
                value="{{ category }}">
-        <button type="submit" class="btn-primary">Search</button>
+        <button type="submit" class="btn btn-primary">Search</button>
     </form>
     {% for course in courses %}
         <div class="course-card">
             <h3>{{ course.title }}</h3>
+            {% if user.is_authenticated %}
+                {% if course.id in enrolled_ids %}
+                    <button class="btn btn-secondary" disabled>Enrolled</button>
+                {% else %}
+                    <a href="{% url 'enroll_course' course.id %}" class="btn btn-primary ">Enroll</a>
+                {% endif %}
+            {% endif %}
             <p>{{ course.description }}</p>
             <small><strong>Category:</strong> {{ course.category }}</small>
         </div>
