@@ -90,7 +90,7 @@ class QuestionAdminTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Test question")
 
-    def test_question_admin_list_filter(self):
+    def test_question_admin_list_filter_display(self):
         """Test that the list filter for pub_date is present."""
         response = self.client.get(reverse("custom_admin:polls_question_changelist"))
         self.assertEqual(response.status_code, 200)
