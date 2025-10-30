@@ -1,9 +1,7 @@
-from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
+from .views import user_login, user_logout
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("accounts/", include("accounts.urls")),
-    path("courses/", include("courses.urls")),
-    path("enrollments/", include("enrollments.urls")),
+    path("login/", user_login, name="login"),
+    path("logout/", user_logout, name="logout"),
 ]

@@ -79,6 +79,10 @@ TEMPLATES = [
     },
 ]
 
+STATIC_URL = "/static/"  # This is the URL prefix browsers use to request static files.
+STATICFILES_DIRS = [
+    BASE_DIR / "static"
+]  # Tells Django where your static files live in your project during development.
 WSGI_APPLICATION = "config.wsgi.application"
 
 

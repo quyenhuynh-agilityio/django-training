@@ -1,3 +1,6 @@
+from django.urls import path
+from .views import course_list
+
 urlpatterns = [
-    # Define your URL patterns here
+    path("", course_list, name="course_list"),
 ]
