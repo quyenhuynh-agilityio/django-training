@@ -11,5 +11,8 @@
         <label for="password">Password</label>
         <input id="password" type="password" name="password" required>
         <button type="submit" class="btn-login">Login</button>
+        {% if messages %}
+            {% for message in messages %}<p class="error">{{ message }}</p>{% endfor %}
+        {% endif %}
     </form>
 {% endblock content %}
