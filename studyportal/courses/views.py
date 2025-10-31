@@ -1,21 +1,39 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from .models import Course
 from enrollments.models import Enrollment
 
 
 def course_list(request):
-    query = request.GET.get("q", "").strip()
-    category = request.GET.get("category", "").strip()
+    # Handle search query and category from POST
+    query = ""
+    category = ""
+    if request.method == "POST":
+        query = request.POST.get("q", "").strip()
+        category = request.POST.get("category", "").strip()
 
+    # Get all active courses
     courses = Course.objects.filter(is_active=True)
 
+    # Filter by search query
     if query:
         courses = courses.filter(title__icontains=query)
 
-    if category:
-        courses = courses.filter(category__icontains=category)
+    # Get unique, normalized categories
+    all_categories = Course.objects.filter(is_active=True).values_list(
+        "category", flat=True
+    )
+    categories = sorted(set([cat.strip() for cat in all_categories if cat]))
 
+    # Default category to first if none selected
+    if not category and categories:
+        category = categories[0]
+
+    # Filter courses by selected category
+    if category:
+        courses = courses.filter(category=category)
+
+    # Get enrolled course IDs for the current user
     enrolled_ids = []
     if request.user.is_authenticated:
         enrolled_ids = Enrollment.objects.filter(
@@ -29,6 +47,7 @@ def course_list(request):
             "courses": courses,
             "query": query,
             "category": category,
+            "categories": categories,
             "enrolled_ids": enrolled_ids,
         },
     )
@@ -37,10 +56,7 @@ def course_list(request):
 @login_required(login_url="/accounts/login/")
 def enroll_course(request, course_id):
     course = get_object_or_404(Course, id=course_id)
-
-    # Prevent duplicate enrollment
     Enrollment.objects.get_or_create(
         user=request.user, course=course, defaults={"is_deleted": False}
     )
-
     return redirect("enrolled_courses")

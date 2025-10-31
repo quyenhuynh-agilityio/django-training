@@ -1,154 +1,46 @@
-body {
-    font-family: Arial, sans-serif;
-    background: #f5f6f8;
+/* ================================
+   General body styles
+   ================================ */
+   html, body {
+    height: 100%;
     margin: 0;
-  }
-
-  /* Layout */
-  .container {
-    max-width: 900px;
-    margin: 25px auto;
-    background: white;
-    padding: 25px;
-    border-radius: 10px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-  }
-
-  /* Navbar */
-  .navbar {
-    background: #0d6efd;
-    padding: 12px 20px;
+    font-family: 'Roboto', sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: white;
-  }
-
-  .navbar-item {
-    color: white;
-    text-decoration: none;
-    padding: 8px 14px;
-    border-radius: 6px;
-  }
-
-  .navbar a:hover {
-    background: rgba(255,255,255,0.2);
-  }
-
-  /* Page Headers */
-  .course-header {
-    margin-bottom: 20px;
-  }
-
-
-.btn {
-  background: #0d6efd;
-  color: white;
-  border-radius: 6px;
-  padding: 8px 12px;
-  border: none;
-  font-weight: 500;
-  transition: all 0.2s ease;
+    flex-direction: column; /* Flex layout to push footer down */
+    min-height: 100vh;
 }
 
-.btn-primary {
-  cursor: pointer;
+/* Main content */
+main.content {
+    flex: 1 0 auto; /* grow, shrink, auto */
+    padding: 2rem 0;
 }
 
-.btn-primary:hover {
-  background: #0b5ed7;
+/* ================================
+   Navbar
+   ================================ */
+nav {
+    padding: 0 20px;
+    background-color: #49BBBD;
 }
 
-.btn-secondary {
-  cursor: not-allowed;
-  opacity: 0.55;        /* dim look */
-  pointer-events: none; /* prevent click */
-}
-
-
-  /* Cards */
-  .course-card {
-    background: #fafafa;
-    border: 1px solid #ddd;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-  }
-
-  /* Search box */
-  .search-box {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-
-  .search-box input {
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-  }
-
-  /* Footer */
-  .footer {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-size: 14px;
-  }
-
-
-  /* --- Login Page --- */
-
-.login-title {
-    text-align: center;
-    margin-bottom: 20px;
-    font-size: 26px;
+.brand-logo {
     font-weight: 600;
-  }
+    font-size: 2rem;
+}
 
-  .login-form {
-    max-width: 350px;
-    margin: 0 auto;
-    padding: 25px;
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .login-form label {
-    font-size: 14px;
+.nav-item {
     font-weight: 500;
-  }
+    font-size: 1rem;
+}
 
-  .login-form input {
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 15px;
-  }
-
-  .login-form input:focus {
-    border-color: #2563eb;
-    outline: none;
-    box-shadow: 0 0 4px rgba(37,99,235,0.4);
-  }
-
-  .btn-login {
-    margin-top: 10px;
-    padding: 10px;
-    background: #2563eb;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: 0.2s ease;
-  }
-
-  .btn-login:hover {
-    background: #1e4fc0;
-  }
+/* ================================
+   Footer
+   ================================ */
+.page-footer {
+    padding: 20px 0;
+    font-size: 1rem;
+    background-color: #49BBBD;
+}

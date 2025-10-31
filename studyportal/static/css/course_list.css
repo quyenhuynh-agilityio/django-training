@@ -1,0 +1,85 @@
+/* ================================
+   General body & container
+   ================================ */
+   .course-header {
+    margin: 2rem 0 1rem 0;
+    font-weight: 600;
+    color: #0d47a1;
+}
+
+.course-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.course-card.hoverable:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+/* ================================
+   Buttons
+   ================================ */
+.btn {
+    border-radius: 50px;
+    font-weight: 600;
+    text-transform: uppercase;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+.btn:hover {
+    transform: translateY(-2px);
+}
+.btn-primary {
+    background-color: #0d47a1;
+}
+.btn-primary:hover {
+    background-color: #08306b;
+}
+.btn-secondary {
+    background-color: #9e9e9e;
+}
+.btn-secondary:hover {
+    background-color: #757575;
+}
+
+/* ================================
+   Categories
+   ================================ */
+.categories-row {
+    margin-bottom: 2rem;
+}
+.btn-category {
+    margin: 0.2rem;
+    text-transform: none;
+    font-weight: 500;
+    color: #fff;
+}
+
+/* ================================
+   Search input
+   ================================ */
+.search-box .input-field {
+    position: relative;
+}
+.search-box input[type="text"] {
+    width: 100%;
+    padding-left: 2.5rem;
+    border-radius: 50px;
+    border: 1px solid #ccc;
+}
+.search-box input[type="text"]:focus {
+    border-color: #0d47a1;
+    box-shadow: 0 0 5px rgba(13, 71, 161, 0.3);
+}
+
+/* Material icon for search */
+.search-box .material-icons.prefix {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9e9e9e;
+}
