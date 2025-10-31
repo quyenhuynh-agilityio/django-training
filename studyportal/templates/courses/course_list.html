@@ -47,6 +47,12 @@
                         <br>
                         <small><strong>Category:</strong> {{ course.category }}</small>
                     </div>
+                    {% if user.is_authenticated and course.video_url %}
+                        <iframe src="https://www.youtube.com/embed/{{ course.video_id }}"
+                                frameborder="0"
+                                allowfullscreen>
+                        </iframe>
+                    {% endif %}
                     <div class="card-action">
                         {% if user.is_authenticated %}
                             {% if course.id in enrolled_ids %}
