@@ -3,8 +3,10 @@
 {% block title %}
     Courses
 {% endblock title %}
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/course_list.css' %}">
+{% endblock extra_css %}
 {% block content %}
-    <h2 class="course-header center-align">Courses</h2>
     <!-- Search Row -->
     <form method="post" class="search-box row">
         {% csrf_token %}
@@ -22,7 +24,7 @@
     <form method="post" class="categories-form">
         {% csrf_token %}
         <input type="hidden" name="q" value="{{ query }}">
-        <div class="row center-align categories-row">
+        <div class="row categories-row">
             {% for cat in categories %}
                 <button type="submit"
                         name="category"
@@ -34,22 +36,34 @@
         </div>
     </form>
     <!-- Courses -->
-    {% for course in courses %}
-        <div class="course-card">
-            <h3>{{ course.title }}</h3>
-            {% if user.is_authenticated %}
-                {% if course.id in enrolled_ids %}
-                    <button class="btn btn-secondary" disabled>Enrolled</button>
-                {% else %}
-                    <a href="{% url 'enroll_course' course.id %}" class="btn btn-primary">Enroll</a>
-                {% endif %}
-            {% else %}
-                <a href="{% url 'login' %}" class="btn btn-primary">Login to Enroll</a>
-            {% endif %}
-            <p>{{ course.description }}</p>
-            <small><strong>Category:</strong> {{ course.category }}</small>
-        </div>
-    {% empty %}
-        <p>No courses available.</p>
-    {% endfor %}
+    <!-- Courses -->
+    <div class="row">
+        {% for course in courses %}
+            <div class="col s12 m6">
+                <div class="card equal-card hoverable">
+                    <div class="card-content">
+                        <span class="card-title">{{ course.title }}</span>
+                        <p>{{ course.description }}</p>
+                        <br>
+                        <small><strong>Category:</strong> {{ course.category }}</small>
+                    </div>
+                    <div class="card-action">
+                        {% if user.is_authenticated %}
+                            {% if course.id in enrolled_ids %}
+                                <button class="btn btn-secondary" disabled>Enrolled</button>
+                            {% else %}
+                                <a href="{% url 'enroll_course' course.id %}" class="btn btn-primary">Enroll</a>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'login' %}" class="btn btn-primary">Login to Enroll</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col s12">
+                <p>No courses available.</p>
+            </div>
+        {% endfor %}
+    </div>
 {% endblock content %}
