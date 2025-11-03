@@ -52,7 +52,7 @@
                     <div class="card-content">
                         <span class="card-title">{{ course.title }}</span>
                         <p class="card-description">{{ course.description }}</p>
-                        <small><strong>Category:</strong> {{ course.category }}</small>
+                        <p class="card-category">Category: {{ course.category }}</p>
                     </div>
                     <div class="card-action">
                         {% if user.is_authenticated %}
@@ -79,26 +79,34 @@
         {% endfor %}
     </div>
     <!-- Pagination (POST-based) -->
-    <div class="center-align pagination-wrapper">
+    <form method="post" class="center-align pagination-wrapper">
+        {% csrf_token %}
+        <input type="hidden" name="q" value="{{ query }}">
+        <input type="hidden" name="category" value="{{ category }}">
         {% if page_obj.has_previous %}
-            <a class="pagination-item"
-               href="?page={{ page_obj.previous_page_number }}">
+            <button type="submit"
+                    name="page"
+                    value="{{ page_obj.previous_page_number }}"
+                    class="pagination-item">
                 <i class="material-icons pagination-icons left">chevron_left</i>
-            </a>
+            </button>
         {% else %}
-            <a class="pagination-item disabled">
+            <button class="pagination-item disabled" disabled>
                 <i class="material-icons pagination-icons left">chevron_left</i>
-            </a>
+            </button>
         {% endif %}
         <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-            <a class="pagination-item" href="?page={{ page_obj.next_page_number }}">
+            <button type="submit"
+                    name="page"
+                    value="{{ page_obj.next_page_number }}"
+                    class="pagination-item">
                 <i class="material-icons pagination-icons right">chevron_right</i>
-            </a>
+            </button>
         {% else %}
-            <a class="pagination-item disabled">
+            <button class="pagination-item disabled" disabled>
                 <i class="material-icons pagination-icons right">chevron_right</i>
-            </a>
+            </button>
         {% endif %}
-    </div>
+    </form>
 {% endblock content %}

@@ -6,21 +6,24 @@ from enrollments.models import Enrollment
 
 
 def course_list(request):
-    # POST request: save search/category in session
+    query = ""
+    category = ""
+
+    # Handle POST search/category/pagination
     if request.method == "POST":
-        request.session["query"] = request.POST.get("q", "").strip()
-        request.session["category"] = request.POST.get("category", "").strip()
-        return redirect("course_list")  # redirect to GET to avoid resubmitting form
+        query = request.POST.get("q", "").strip()
+        category = request.POST.get("category", "").strip()
+        page_number = request.POST.get("page", 1)
+    else:
+        page_number = 1
 
-    # GET request: retrieve filters from session
-    query = request.session.get("query", "")
-    category = request.session.get("category", "")
-
+    # Fetch active courses
     courses = Course.objects.filter(is_active=True)
 
     if query:
         courses = courses.filter(title__icontains=query)
 
+    # Get distinct categories
     all_categories = Course.objects.filter(is_active=True).values_list(
         "category", flat=True
     )
@@ -32,11 +35,11 @@ def course_list(request):
     if category:
         courses = courses.filter(category=category)
 
-    # Pagination: 6 per page
-    paginator = Paginator(courses, 3)
-    page_number = request.GET.get("page")
+    # Pagination
+    paginator = Paginator(courses, 3)  # 6 courses per page
     page_obj = paginator.get_page(page_number)
 
+    # Get enrolled courses for authenticated user
     enrolled_ids = []
     if request.user.is_authenticated:
         enrolled_ids = Enrollment.objects.filter(

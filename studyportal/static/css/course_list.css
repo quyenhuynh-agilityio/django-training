@@ -27,6 +27,11 @@
   font-weight: 600;
 }
 
+.card-category {
+  font-size: 14px;
+  padding-top: 4px;
+}
+
 .card-image {
   width: 100%;
   height: 200px;
@@ -176,6 +181,7 @@
   padding: 0.5rem 0.8rem;
   border-radius: 50px;
   background-color: #49BBBD;
+  border: 1px;
   color: #fff;
   font-weight: 600;
   text-transform: uppercase;
