@@ -9,22 +9,23 @@
 {% block content %}
     <div class="login-container">
         <h2 class="login-title">Login</h2>
-        <form method="post" class="login-form">
+        <form method="post" class="login-form" novalidate>
             {% csrf_token %}
+            <!-- Username -->
             <div class="input-field">
-                <input id="username" type="text" name="username" required>
-                <label for="username">Username</label>
+                {{ form.username }}
+                <label for="{{ form.username.id_for_label }}">Username</label>
+                {% if form.username.errors %}<span class="error">{{ form.username.errors.0 }}</span>{% endif %}
             </div>
+            <!-- Password -->
             <div class="input-field">
-                <input id="password" type="password" name="password" required>
-                <label for="password">Password</label>
+                {{ form.password }}
+                <label for="{{ form.password.id_for_label }}">Password</label>
+                {% if form.password.errors %}<span class="error">{{ form.password.errors.0 }}</span>{% endif %}
             </div>
-            <button type="submit" class="btn-login btn waves-effect waves-light">Login</button>
-            {% if messages %}
-                <div class="messages">
-                    {% for message in messages %}<p class="error">{{ message }}</p>{% endfor %}
-                </div>
-            {% endif %}
+            <!-- Wrong credentials -->
+            {% if form.non_field_errors %}<span class="error">{{ form.non_field_errors.0 }}</span>{% endif %}
+            <button type="submit" class="btn btn-login waves-effect waves-light">Login</button>
         </form>
     </div>
 {% endblock content %}

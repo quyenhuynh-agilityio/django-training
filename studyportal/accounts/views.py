@@ -1,24 +1,35 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib import messages
+from django.contrib.auth import login, logout
+from django.contrib.auth.forms import AuthenticationForm
 
 
 def user_login(request):
+    # Check if form submitted
     if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
+        # Bind submitted data to Django's built-in login form
+        form = AuthenticationForm(request, data=request.POST)
 
-        user = authenticate(request, username=username, password=password)
+        # Validate credentials
+        if form.is_valid():
+            # Get the authenticated user
+            user = form.get_user()
 
-        if user:
+            # Log the user in (creates session)
             login(request, user)
-            return redirect("/")
-        else:
-            messages.error(request, "Invalid username or password")
 
-    return render(request, "accounts/login.html")
+            # Redirect to homepage (or you can use next param)
+            return redirect("/")
+    else:
+        # If GET request, display empty form
+        form = AuthenticationForm()
+
+    # Render login page with the form (including errors if POST failed)
+    return render(request, "accounts/login.html", {"form": form})
 
 
 def user_logout(request):
+    # Log the user out (destroy session)
     logout(request)
+
+    # Redirect to homepage after logout
     return redirect("/")
