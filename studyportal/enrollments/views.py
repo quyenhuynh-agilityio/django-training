@@ -7,4 +7,4 @@ from .models import Enrollment
 def enrolled_courses(request):
     enrollments = Enrollment.objects.filter(user=request.user, is_deleted=False)
     courses = [en.course for en in enrollments]
-    return render(request, "courses/enrolled_courses.html", {"courses": courses})
+    return render(request, "courses/course_list.html", {"courses": courses})

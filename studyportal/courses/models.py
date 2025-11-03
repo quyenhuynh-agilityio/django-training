@@ -13,6 +13,7 @@ class Course(models.Model):
     description = models.TextField()
     category = models.CharField(max_length=100)
     video_url = models.URLField(max_length=500, blank=True, null=True)
+    image_url = models.URLField(max_length=500, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

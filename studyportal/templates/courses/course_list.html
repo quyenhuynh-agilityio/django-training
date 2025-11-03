@@ -17,6 +17,7 @@
                        type="text"
                        name="q"
                        value="{{ query }}">
+                <i class="material-icons prefix">search</i>
             </div>
         </div>
     </form>
@@ -35,33 +36,38 @@
             {% endfor %}
         </div>
     </form>
-    <!-- Courses -->
-    <!-- Courses -->
+    <!-- Courses Grid -->
     <div class="row">
         {% for course in courses %}
-            <div class="col s12 m6">
+            <div class="col s12 m6 l4">
                 <div class="card equal-card hoverable">
+                    <!-- Course Image -->
+                    {% if course.image_url %}
+                        <img class="card-image"
+                             src="{{ course.image_url }}"
+                             alt="{{ course.title }}"
+                             width="400"
+                             height="200">
+                    {% endif %}
                     <div class="card-content">
                         <span class="card-title">{{ course.title }}</span>
-                        <p>{{ course.description }}</p>
-                        <br>
+                        <p class="card-description">{{ course.description }}</p>
                         <small><strong>Category:</strong> {{ course.category }}</small>
                     </div>
-                    {% if user.is_authenticated and course.video_url %}
-                        <iframe src="https://www.youtube.com/embed/{{ course.video_id }}"
-                                frameborder="0"
-                                allowfullscreen>
-                        </iframe>
-                    {% endif %}
                     <div class="card-action">
                         {% if user.is_authenticated %}
                             {% if course.id in enrolled_ids %}
                                 <button class="btn btn-secondary" disabled>Enrolled</button>
+                                {% if course.video_url %}
+                                    <a href="{{ course.video_url }}"
+                                       target="_blank"
+                                       class="btn btn-primary watch-btn">Watch Video</a>
+                                {% endif %}
                             {% else %}
                                 <a href="{% url 'enroll_course' course.id %}" class="btn btn-primary">Enroll</a>
                             {% endif %}
                         {% else %}
-                            <a href="{% url 'login' %}" class="btn btn-primary">Login to Enroll</a>
+                            <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
                         {% endif %}
                     </div>
                 </div>
@@ -71,5 +77,28 @@
                 <p>No courses available.</p>
             </div>
         {% endfor %}
+    </div>
+    <!-- Pagination (POST-based) -->
+    <div class="center-align pagination-wrapper">
+        {% if page_obj.has_previous %}
+            <a class="pagination-item"
+               href="?page={{ page_obj.previous_page_number }}">
+                <i class="material-icons pagination-icons left">chevron_left</i>
+            </a>
+        {% else %}
+            <a class="pagination-item disabled">
+                <i class="material-icons pagination-icons left">chevron_left</i>
+            </a>
+        {% endif %}
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a class="pagination-item" href="?page={{ page_obj.next_page_number }}">
+                <i class="material-icons pagination-icons right">chevron_right</i>
+            </a>
+        {% else %}
+            <a class="pagination-item disabled">
+                <i class="material-icons pagination-icons right">chevron_right</i>
+            </a>
+        {% endif %}
     </div>
 {% endblock content %}
