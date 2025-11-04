@@ -1,10 +1,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from .models import Course
 from enrollments.models import Enrollment
 
 
+# This ensures Django regenerates a valid CSRF(Cross-Site Request Forgery) token properly.
+@csrf_protect
 def course_list(request):
     query = ""
     category = ""

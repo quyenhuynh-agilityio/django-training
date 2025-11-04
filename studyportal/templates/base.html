@@ -7,6 +7,8 @@
         <meta name="description"
               content="Study Portal is a platform for learning and improving your skills.">
         <meta name="keywords" content="study, portal, learning, education, courses">
+        {% comment %} Add CSRF cookie in base.html (for POST SPA-like behavior) {% endcomment %}
+        <meta name="csrf-token" content="{{ csrf_token }}">
         <title>
             {% block title %}
                 Study Portal
@@ -36,4 +38,14 @@
         <!-- Materialize JS -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     </body>
+    {% comment %} This prevents "old CSRF token" issues after login. {% endcomment %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // When page loads, refresh CSRF cookie if exists
+            const token = document.querySelector('meta[name="csrf-token"]')?.content;
+            if (token) {
+                document.cookie = `csrftoken=${token}; path=/`;
+            }
+        });
+    </script>
 </html>
