@@ -34,6 +34,18 @@ Install on your machine:
 Access:
 - Admin site: `http://localhost:8000/admin/`
 
+### Run tests and coverage
+- Run Django tests:
+  - `uv run python manage.py test`
+- (Optional) Install coverage tool if not installed:
+  - `uv add --dev coverage`
+- Run tests with coverage:
+  - `uv run coverage run manage.py test`
+- See coverage summary in terminal:
+  - `uv run coverage report -m`
+- Generate HTML coverage report:
+  - `uv run coverage html` (open `htmlcov/index.html`)
+
 ### Notes
 - Apps included: `accounts`, `courses`, `enrollments`, `core`.
 - Custom user model: `accounts.User`.

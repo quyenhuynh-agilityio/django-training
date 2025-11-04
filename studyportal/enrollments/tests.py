@@ -254,6 +254,9 @@ class EnrolledCoursesViewTest(TestCase):
 
     def test_enrolled_courses_excludes_deleted_enrollments(self):
         """Test that soft-deleted enrollments are not shown."""
+        # Create a non-deleted enrollment that should remain visible
+        Enrollment.objects.create(user=self.user, course=self.course1)
+
         enrollment2 = Enrollment.objects.create(user=self.user, course=self.course2)
 
         # Soft delete one enrollment

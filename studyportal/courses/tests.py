@@ -412,6 +412,8 @@ class EnrollCourseViewTest(TestCase):
         url = reverse("enroll_course", args=[self.course.id])
         self.client.get(url)
 
+        # Create second user and log in
+        User.objects.create_user(username="user2", password="pass123")
         self.client.login(username="user2", password="pass123")
         self.client.get(url)
 
