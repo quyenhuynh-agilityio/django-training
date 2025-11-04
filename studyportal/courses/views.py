@@ -36,7 +36,7 @@ def course_list(request):
         courses = courses.filter(category=category)
 
     # Pagination
-    paginator = Paginator(courses, 3)  # 6 courses per page
+    paginator = Paginator(courses, 3)  # 3 courses per page
     page_obj = paginator.get_page(page_number)
 
     # Get enrolled courses for authenticated user
