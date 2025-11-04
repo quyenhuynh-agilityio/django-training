@@ -67,10 +67,6 @@
   transition: 0.3s ease;
 }
 
-.btn:hover {
-  transform: translateY(-2px);
-}
-
 .btn-primary {
   background-color: #49BBBD;
 }
@@ -190,7 +186,6 @@
 
 .pagination-item:hover {
   background-color: #49BBBD;
-  transform: translateY(-2px);
 }
 
 .pagination-icons {
