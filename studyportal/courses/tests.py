@@ -214,12 +214,10 @@ class CourseListViewTest(TestCase):
         self.assertEqual(len(courses), 0)
 
     def test_category_filter_default_selection(self):
-        """Test that first category is selected by default when no category specified."""
+        """Test that no category is selected by default when no category specified."""
         response = self.client.get(reverse("course_list"))
-        categories = response.context["categories"]
         selected_category = response.context["category"]
-        if categories:
-            self.assertEqual(selected_category, categories[0])
+        self.assertEqual(selected_category, "")
 
     def test_categories_list_in_context(self):
         """Test that categories list is in context."""

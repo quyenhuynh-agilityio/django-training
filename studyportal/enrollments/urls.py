@@ -3,5 +3,4 @@ from .views import enrolled_courses
 
 urlpatterns = [
     path("my-courses/", enrolled_courses, name="enrolled_courses"),
-    path("enrolled/", enrolled_courses, name="enrolled_courses"),
 ]

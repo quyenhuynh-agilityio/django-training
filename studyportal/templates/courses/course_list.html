@@ -10,6 +10,7 @@
     <!-- Search Row -->
     <form method="post" class="search-box row">
         {% csrf_token %}
+        <input type="hidden" name="category" value="{{ category }}">
         <div class="col s12 m8">
             <div class="input-field">
                 <input placeholder="Search Course..."
@@ -26,11 +27,17 @@
         {% csrf_token %}
         <input type="hidden" name="q" value="{{ query }}">
         <div class="row categories-row">
+            <button type="submit"
+                    name="category"
+                    value=""
+                    class="btn-category btn {% if not category %} btn-primary {% else %} btn-secondary {% endif %}">
+                All
+            </button>
             {% for cat in categories %}
                 <button type="submit"
                         name="category"
                         value="{{ cat }}"
-                        class="btn-category btn {% if cat == category %} btn-primary {% elif forloop.first and not category %} btn-primary {% else %} btn-secondary {% endif %}">
+                        class="btn-category btn {% if cat == category %} btn-primary {% else %} btn-secondary {% endif %}">
                     {{ cat }}
                 </button>
             {% endfor %}

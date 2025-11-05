@@ -36,6 +36,44 @@ nav {
     font-size: 18px;
 }
 
+.nav-item.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 0 10px;
+}
+
+/* Mobile hamburger menu button */
+.sidenav-trigger {
+    display: none !important;
+}
+
+@media only screen and (max-width: 992px) {
+    .sidenav-trigger {
+        display: block !important;
+    }
+
+    .brand-logo {
+        font-size: 1.5rem;
+    }
+}
+
+/* Mobile sidenav styling */
+.sidenav {
+    background-color: #49BBBD;
+}
+
+.sidenav li > a,
+.sidenav li > div {
+    color: #fff;
+    font-weight: 500;
+    font-size: 18px;
+    padding: 0 10px;
+}
+
+.sidenav li > a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
 /* ================================
    Footer
    ================================ */

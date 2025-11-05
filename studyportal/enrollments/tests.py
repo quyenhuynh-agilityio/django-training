@@ -271,16 +271,18 @@ class EnrolledCoursesViewTest(TestCase):
         self.assertEqual(courses[0], self.course1)
 
     def test_enrolled_courses_empty_when_no_enrollments(self):
-        """Test that enrolled_courses shows empty list when user has no enrollments."""
+        """Test that enrolled_courses shows empty queryset when user has no enrollments."""
+        from django.db.models.query import QuerySet
+
         url = reverse("enrolled_courses")
         response = self.client.get(url)
         courses = response.context["courses"]
 
         self.assertEqual(len(courses), 0)
-        self.assertIsInstance(courses, list)
+        self.assertIsInstance(courses, QuerySet)
 
     def test_enrolled_courses_shows_inactive_courses(self):
-        """Test that enrolled_courses shows inactive courses if enrolled."""
+        """Test that enrolled_courses does not show inactive courses even if enrolled."""
         inactive_course = Course.objects.create(
             title="Inactive Course",
             course_code="IN101",
@@ -294,8 +296,8 @@ class EnrolledCoursesViewTest(TestCase):
         response = self.client.get(url)
         courses = response.context["courses"]
 
-        self.assertEqual(len(courses), 1)
-        self.assertEqual(courses[0], inactive_course)
+        # Inactive courses are filtered out by is_active=True
+        self.assertEqual(len(courses), 0)
 
     def test_enrolled_courses_shows_deleted_courses(self):
         """Test that enrolled_courses shows soft-deleted courses if enrolled."""

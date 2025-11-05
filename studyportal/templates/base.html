@@ -46,6 +46,10 @@
             if (token) {
                 document.cookie = `csrftoken=${token}; path=/`;
             }
+
+            // Initialize Materialize sidenav for mobile menu
+            const sidenavElems = document.querySelectorAll('.sidenav');
+            M.Sidenav.init(sidenavElems);
         });
     </script>
 </html>

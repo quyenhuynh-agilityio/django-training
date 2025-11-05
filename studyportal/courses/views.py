@@ -32,9 +32,7 @@ def course_list(request):
     )
     categories = sorted({cat.strip() for cat in all_categories if cat})
 
-    if not category and categories:
-        category = categories[0]
-
+    # Only filter by category if one is explicitly selected
     if category:
         courses = courses.filter(category=category)
 
