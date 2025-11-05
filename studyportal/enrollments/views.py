@@ -1,12 +1,10 @@
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_protect
 from courses.models import Course
 from .models import Enrollment
 
 
-@csrf_protect
 @login_required(login_url="/accounts/login/")
 def enrolled_courses(request):
     query = ""
