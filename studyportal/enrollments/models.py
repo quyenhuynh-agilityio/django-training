@@ -24,4 +24,4 @@ class Enrollment(models.Model):
         ordering = ["-enrolled_at"]
 
     def __str__(self):
-        return f"{self.user.username} -> {self.course.title}"
+        return f"{self.user.username}  and {self.course.title}"

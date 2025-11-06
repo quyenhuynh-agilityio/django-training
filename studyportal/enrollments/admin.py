@@ -9,6 +9,14 @@ class EnrollmentAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "course__title")
     actions = ["soft_delete_enrollments"]
 
+    # Disable Add & Edit from admin
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False  # prevents editing record
+
+    # Still allow soft delete action
     def soft_delete_enrollments(self, request, queryset):
         queryset.update(is_deleted=True)
 
