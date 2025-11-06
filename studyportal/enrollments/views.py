@@ -16,7 +16,7 @@ def enrolled_courses(request):
     from .models import Enrollment
 
     enrolled_ids = list(
-        Enrollment.objects.filter(user=request.user, is_deleted=False).values_list(
+        Enrollment.objects.filter(user=request.user, is_active=True).values_list(
             "course_id", flat=True
         )
     )

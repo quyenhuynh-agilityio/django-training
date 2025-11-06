@@ -30,7 +30,7 @@ def enroll_course(request, course_id):
     course = get_object_or_404(Course, id=course_id)
 
     Enrollment.objects.get_or_create(
-        user=request.user, course=course, defaults={"is_deleted": False}
+        user=request.user, course=course, defaults={"is_active": True}
     )
 
     return redirect("enrolled_courses")
