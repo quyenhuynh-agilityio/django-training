@@ -8,9 +8,7 @@
 {% endblock extra_css %}
 {% block content %}
     <!-- Search Row -->
-    <form method="post" class="search-box row">
-        {% csrf_token %}
-        <input type="hidden" name="category" value="{{ category }}">
+    <form method="get" class="search-box row">
         <div class="col s12 m8">
             <div class="input-field">
                 <input placeholder="Search Course..."
@@ -21,28 +19,20 @@
                 <i class="material-icons prefix">search</i>
             </div>
         </div>
+        <!-- Preserve category when searching -->
+        {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
     </form>
     <!-- Categories Row -->
-    <form method="post" class="categories-form">
-        {% csrf_token %}
-        <input type="hidden" name="q" value="{{ query }}">
-        <div class="row categories-row">
-            <button type="submit"
-                    name="category"
-                    value=""
-                    class="btn-category btn {% if not category_name %} btn-primary {% else %} btn-secondary {% endif %}">
-                All
-            </button>
-            {% for cat in categories %}
-                <button type="submit"
-                        name="category"
-                        value="{{ cat.id }}"
-                        class="btn-category btn {% if cat.name == category_name %} btn-primary {% else %} btn-secondary {% endif %}">
-                    {{ cat.name }}
-                </button>
-            {% endfor %}
-        </div>
-    </form>
+    <div class="row categories-row">
+        <a href="?{% if query %}q={{ query }}&{% endif %}"
+           class="btn-category btn {% if not category %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+        {% for cat in categories %}
+            <a href="?q={{ query }}&category={{ cat.id }}"
+               class="btn-category btn {% if cat.id|stringformat:'s' == category %}btn-primary{% else %}btn-secondary{% endif %}">
+                {{ cat.name }}
+            </a>
+        {% endfor %}
+    </div>
     <!-- Courses Grid -->
     <div class="row">
         {% for course in courses %}
@@ -96,34 +86,27 @@
         {% endfor %}
     </div>
     <!-- Pagination (POST-based) -->
-    <form method="post" class="center-align pagination-wrapper">
-        {% csrf_token %}
-        <input type="hidden" name="q" value="{{ query }}">
-        <input type="hidden" name="category" value="{{ category }}">
+    <div class="center-align pagination-wrapper">
         {% if page_obj.has_previous %}
-            <button type="submit"
-                    name="page"
-                    value="{{ page_obj.previous_page_number }}"
-                    class="pagination-item">
+            <a href="?q={{ query }}&category={{ category }}&page={{ page_obj.previous_page_number }}"
+               class="pagination-item">
                 <i class="material-icons pagination-icons left">chevron_left</i>
-            </button>
+            </a>
         {% else %}
-            <button class="pagination-item disabled" disabled>
+            <span class="pagination-item disabled">
                 <i class="material-icons pagination-icons left">chevron_left</i>
-            </button>
+            </span>
         {% endif %}
         <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-            <button type="submit"
-                    name="page"
-                    value="{{ page_obj.next_page_number }}"
-                    class="pagination-item">
+            <a href="?q={{ query }}&category={{ category }}&page={{ page_obj.next_page_number }}"
+               class="pagination-item">
                 <i class="material-icons pagination-icons right">chevron_right</i>
-            </button>
+            </a>
         {% else %}
-            <button class="pagination-item disabled" disabled>
+            <span class="pagination-item disabled">
                 <i class="material-icons pagination-icons right">chevron_right</i>
-            </button>
+            </span>
         {% endif %}
-    </form>
+    </div>
 {% endblock content %}

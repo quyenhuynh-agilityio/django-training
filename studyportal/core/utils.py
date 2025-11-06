@@ -9,17 +9,12 @@ from courses.models import Course, Category
 
 def get_course_filter_params(request):
     """
-    Extract filter parameters from POST request.
+    Extract filter params from GET request.
     Returns: tuple of (query, category, page_number)
     """
-    if request.method == "POST":
-        query = request.POST.get("q", "").strip()
-        category = request.POST.get("category", "").strip()
-        page_number = request.POST.get("page", 1)
-    else:
-        query = ""
-        category = ""
-        page_number = 1
+    query = request.GET.get("q", "").strip()
+    category = request.GET.get("category", "").strip()
+    page_number = request.GET.get("page", 1)
 
     return query, category, page_number
 
