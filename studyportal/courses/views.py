@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from .models import Course
+from .models import Course, Category
 from enrollments.models import Enrollment
 
 
@@ -20,21 +20,32 @@ def course_list(request):
     else:
         page_number = 1
 
-    # Fetch active courses
-    courses = Course.objects.filter(is_active=True)
+    # Fetch active courses with categories relationship
+    courses = Course.objects.filter(is_active=True).prefetch_related("categories")
 
     if query:
         courses = courses.filter(title__icontains=query)
 
-    # Get distinct categories
-    all_categories = Course.objects.filter(is_active=True).values_list(
-        "category", flat=True
+    # Get distinct categories from active courses
+    category_ids = (
+        Course.objects.filter(is_active=True, categories__isnull=False)
+        .values_list("categories__id", flat=True)
+        .distinct()
     )
-    categories = sorted({cat.strip() for cat in all_categories if cat})
+    categories = Category.objects.filter(id__in=category_ids, is_active=True).order_by(
+        "name"
+    )
 
     # Only filter by category if one is explicitly selected
     if category:
-        courses = courses.filter(category=category)
+        try:
+            category_obj = Category.objects.get(id=category, is_active=True)
+            courses = courses.filter(categories=category_obj)
+            category = category_obj.name  # Store name for template
+        except (Category.DoesNotExist, ValueError):
+            # Invalid category UUID - return empty queryset
+            courses = courses.none()
+            category = ""
 
     # Pagination
     paginator = Paginator(courses, 3)  # 3 courses per page

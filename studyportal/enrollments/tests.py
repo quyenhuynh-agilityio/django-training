@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.db import IntegrityError
-from courses.models import Course
+from courses.models import Course, Category
 from .models import Enrollment
 
 User = get_user_model()
@@ -18,13 +18,14 @@ class EnrollmentModelTest(TestCase):
             email="student1@example.com",
             password="password123",
         )
+        self.category = Category.objects.create(name="Web Development", is_active=True)
         self.course = Course.objects.create(
             title="Django Basics",
             course_code="DJ101",
             description="Learn Django",
-            category="Web Development",
             is_active=True,
         )
+        self.course.categories.add(self.category)
 
     def test_enrollment_creation(self):
         """Test creating an enrollment."""
@@ -79,12 +80,13 @@ class EnrollmentModelTest(TestCase):
 
     def test_enrollment_ordering_by_enrolled_at_descending(self):
         """Test that enrollments are ordered by enrolled_at descending."""
+        programming_category = Category.objects.create(name="Programming")
         course2 = Course.objects.create(
             title="Python Basics",
             course_code="PY101",
             description="Learn Python",
-            category="Programming",
         )
+        course2.categories.add(programming_category)
 
         enrollment1 = Enrollment.objects.create(user=self.user, course=self.course)
         enrollment2 = Enrollment.objects.create(user=self.user, course=course2)
@@ -139,12 +141,13 @@ class EnrollmentModelTest(TestCase):
 
     def test_user_enrolls_multiple_courses(self):
         """Test that a user can enroll in multiple courses."""
+        programming_category = Category.objects.create(name="Programming")
         course2 = Course.objects.create(
             title="Python Basics",
             course_code="PY101",
             description="Learn Python",
-            category="Programming",
         )
+        course2.categories.add(programming_category)
 
         enrollment1 = Enrollment.objects.create(user=self.user, course=self.course)
         enrollment2 = Enrollment.objects.create(user=self.user, course=course2)
@@ -178,28 +181,35 @@ class EnrolledCoursesViewTest(TestCase):
         )
         self.client.login(username="student1", password="password123")
 
+        # Create test categories
+        self.web_category = Category.objects.create(name="Web", is_active=True)
+        self.programming_category = Category.objects.create(
+            name="Programming", is_active=True
+        )
+        self.test_category = Category.objects.create(name="Test", is_active=True)
+
         # Create test courses
         self.course1 = Course.objects.create(
             title="Django Basics",
             course_code="DJ101",
             description="Learn Django",
-            category="Web",
             is_active=True,
         )
+        self.course1.categories.add(self.web_category)
         self.course2 = Course.objects.create(
             title="Python Basics",
             course_code="PY101",
             description="Learn Python",
-            category="Programming",
             is_active=True,
         )
+        self.course2.categories.add(self.programming_category)
         self.course3 = Course.objects.create(
             title="React Fundamentals",
             course_code="RE101",
             description="Learn React",
-            category="Web",
             is_active=True,
         )
+        self.course3.categories.add(self.web_category)
 
     def test_enrolled_courses_requires_login(self):
         """Test that enrolled_courses view requires authentication."""
@@ -287,9 +297,9 @@ class EnrolledCoursesViewTest(TestCase):
             title="Inactive Course",
             course_code="IN101",
             description="Inactive",
-            category="Test",
             is_active=False,
         )
+        inactive_course.categories.add(self.test_category)
         Enrollment.objects.create(user=self.user, course=inactive_course)
 
         url = reverse("enrolled_courses")
@@ -305,10 +315,10 @@ class EnrolledCoursesViewTest(TestCase):
             title="Deleted Course",
             course_code="DEL101",
             description="Deleted",
-            category="Test",
             is_active=True,
             is_deleted=True,
         )
+        deleted_course.categories.add(self.test_category)
         Enrollment.objects.create(user=self.user, course=deleted_course)
 
         url = reverse("enrolled_courses")

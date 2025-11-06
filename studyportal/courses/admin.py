@@ -1,18 +1,34 @@
 from django.contrib import admin
-from .models import Course
+from .models import Course, Category
+
+
+# Register the Category model in Django Admin
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name", "description")
+    list_per_page = 20
 
 
 # Register the Course model in Django Admin
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     # Fields to display in the admin list view
-    list_display = ("title", "category", "is_active", "is_deleted", "created_at")
+    list_display = ("title", "get_categories", "is_active", "is_deleted", "created_at")
+    filter_horizontal = ("categories",)  # Better UI for many-to-many selection
 
     # Filters on the right side panel
-    list_filter = ("category", "is_active", "is_deleted")
+    list_filter = ("categories", "is_active", "is_deleted")
 
     # Searchable fields (top search bar)
-    search_fields = ("title", "category")
+    search_fields = ("title", "categories__name")
+
+    def get_categories(self, obj):
+        """Display categories as comma-separated string."""
+        return ", ".join([cat.name for cat in obj.categories.all()])
+
+    get_categories.short_description = "Categories"
 
     # Pagination: number of items per page
     list_per_page = 20

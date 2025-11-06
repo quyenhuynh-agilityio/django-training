@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import render
-from courses.models import Course
+from courses.models import Course, Category
 from .models import Enrollment
 
 
@@ -23,25 +23,36 @@ def enrolled_courses(request):
         user=request.user, is_deleted=False
     ).select_related("course")
 
-    # Get courses from enrollments using queryset
+    # Get courses from enrollments using queryset with categories relationship
     enrolled_course_ids = enrollments.values_list("course_id", flat=True)
-    courses = Course.objects.filter(id__in=enrolled_course_ids, is_active=True)
+    courses = Course.objects.filter(
+        id__in=enrolled_course_ids, is_active=True
+    ).prefetch_related("categories")
 
     # Apply search filter if provided
     if query:
         courses = courses.filter(title__icontains=query)
 
-    # Build categories list from enrolled courses (efficiently using values_list)
-    all_categories = (
+    # Build categories list from enrolled courses
+    category_ids = (
         Course.objects.filter(id__in=enrolled_course_ids, is_active=True)
-        .values_list("category", flat=True)
+        .values_list("categories__id", flat=True)
         .distinct()
     )
-    categories = sorted({cat.strip() for cat in all_categories if cat})
+    categories = Category.objects.filter(id__in=category_ids, is_active=True).order_by(
+        "name"
+    )
 
     # Only filter by category if one is explicitly selected
     if category:
-        courses = courses.filter(category=category)
+        try:
+            category_obj = Category.objects.get(id=category, is_active=True)
+            courses = courses.filter(categories=category_obj)
+            category = category_obj.name  # Store name for template
+        except (Category.DoesNotExist, ValueError):
+            # Invalid category UUID - return empty queryset
+            courses = courses.none()
+            category = ""
 
     # Pagination to match course_list template expectations
     paginator = Paginator(courses, 3)

@@ -36,9 +36,9 @@
             {% for cat in categories %}
                 <button type="submit"
                         name="category"
-                        value="{{ cat }}"
-                        class="btn-category btn {% if cat == category %} btn-primary {% else %} btn-secondary {% endif %}">
-                    {{ cat }}
+                        value="{{ cat.id }}"
+                        class="btn-category btn {% if cat.name == category %} btn-primary {% else %} btn-secondary {% endif %}">
+                    {{ cat.name }}
                 </button>
             {% endfor %}
         </div>
@@ -59,7 +59,17 @@
                     <div class="card-content">
                         <span class="card-title">{{ course.title }}</span>
                         <p class="card-description">{{ course.description }}</p>
-                        <p class="card-category">Category: {{ course.category }}</p>
+                        <p class="card-category">
+                            Categories:
+                            {% if course.categories.all %}
+                                {% for cat in course.categories.all %}
+                                    {{ cat.name }}
+                                    {% if not forloop.last %},{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="card-action">
                         {% if user.is_authenticated %}

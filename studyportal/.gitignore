@@ -14,10 +14,8 @@ db.sqlite3
 *.DS_Store
 
 # Django migrations
-*/migrations/*.py
 */migrations/*.pyc
 # keep __init__.py for migrations
-!*/migrations/__init__.py
 
 # Static and media
 /staticfiles/
