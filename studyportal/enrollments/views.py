@@ -1,73 +1,27 @@
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
 from django.shortcuts import render
-from courses.models import Course, Category
-from .models import Enrollment
+from core.utils import get_courses_for_user, build_course_list_context
 
 
 @login_required(login_url="/accounts/login/")
 def enrolled_courses(request):
-    query = ""
-    category = ""
+    """
+    Display enrolled courses for authenticated users.
+    Shows courses based on user role and authentication status.
+    """
+    # Get enrolled courses for the user
+    courses = get_courses_for_user(request.user, enrolled_only=True)
 
-    # Handle POST search/category/pagination
-    if request.method == "POST":
-        query = request.POST.get("q", "").strip()
-        category = request.POST.get("category", "").strip()
-        page_number = request.POST.get("page", 1)
-    else:
-        page_number = 1
+    # Get enrolled course IDs for category filtering
+    from .models import Enrollment
 
-    # Get enrolled courses as a queryset (not a list) for better performance
-    enrollments = Enrollment.objects.filter(
-        user=request.user, is_deleted=False
-    ).select_related("course")
-
-    # Get courses from enrollments using queryset with categories relationship
-    enrolled_course_ids = enrollments.values_list("course_id", flat=True)
-    courses = Course.objects.filter(
-        id__in=enrolled_course_ids, is_active=True
-    ).prefetch_related("categories")
-
-    # Apply search filter if provided
-    if query:
-        courses = courses.filter(title__icontains=query)
-
-    # Build categories list from enrolled courses
-    category_ids = (
-        Course.objects.filter(id__in=enrolled_course_ids, is_active=True)
-        .values_list("categories__id", flat=True)
-        .distinct()
-    )
-    categories = Category.objects.filter(id__in=category_ids, is_active=True).order_by(
-        "name"
+    enrolled_ids = list(
+        Enrollment.objects.filter(user=request.user, is_deleted=False).values_list(
+            "course_id", flat=True
+        )
     )
 
-    # Only filter by category if one is explicitly selected
-    if category:
-        try:
-            category_obj = Category.objects.get(id=category, is_active=True)
-            courses = courses.filter(categories=category_obj)
-            category = category_obj.name  # Store name for template
-        except (Category.DoesNotExist, ValueError):
-            # Invalid category UUID - return empty queryset
-            courses = courses.none()
-            category = ""
-
-    # Pagination to match course_list template expectations
-    paginator = Paginator(courses, 3)
-    page_obj = paginator.get_page(page_number)
-
-    # Enrolled course ids for template logic (all enrolled IDs, not just current page)
-    enrolled_ids = list(enrolled_course_ids)
-
-    context = {
-        "courses": page_obj.object_list,
-        "query": query,
-        "category": category,
-        "categories": categories,
-        "enrolled_ids": enrolled_ids,
-        "page_obj": page_obj,
-    }
+    # Build context with filtering, pagination, etc.
+    context = build_course_list_context(request, courses, enrolled_ids=enrolled_ids)
 
     return render(request, "courses/course_list.html", context)

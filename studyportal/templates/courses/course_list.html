@@ -30,14 +30,14 @@
             <button type="submit"
                     name="category"
                     value=""
-                    class="btn-category btn {% if not category %} btn-primary {% else %} btn-secondary {% endif %}">
+                    class="btn-category btn {% if not category_name %} btn-primary {% else %} btn-secondary {% endif %}">
                 All
             </button>
             {% for cat in categories %}
                 <button type="submit"
                         name="category"
                         value="{{ cat.id }}"
-                        class="btn-category btn {% if cat.name == category %} btn-primary {% else %} btn-secondary {% endif %}">
+                        class="btn-category btn {% if cat.name == category_name %} btn-primary {% else %} btn-secondary {% endif %}">
                     {{ cat.name }}
                 </button>
             {% endfor %}

@@ -1,71 +1,23 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator
-from .models import Course, Category
 from enrollments.models import Enrollment
+from .models import Course
+from core.utils import get_courses_for_user, build_course_list_context
 
 
 # This ensures Django regenerates a valid CSRF(Cross-Site Request Forgery) token properly.
 @csrf_protect
 def course_list(request):
-    query = ""
-    category = ""
+    """
+    Display course list for all users (authenticated and unauthenticated).
+    Shows courses based on user role and authentication status.
+    """
+    # Get courses based on user authentication and role
+    courses = get_courses_for_user(request.user, enrolled_only=False)
 
-    # Handle POST search/category/pagination
-    if request.method == "POST":
-        query = request.POST.get("q", "").strip()
-        category = request.POST.get("category", "").strip()
-        page_number = request.POST.get("page", 1)
-    else:
-        page_number = 1
-
-    # Fetch active courses with categories relationship
-    courses = Course.objects.filter(is_active=True).prefetch_related("categories")
-
-    if query:
-        courses = courses.filter(title__icontains=query)
-
-    # Get distinct categories from active courses
-    category_ids = (
-        Course.objects.filter(is_active=True, categories__isnull=False)
-        .values_list("categories__id", flat=True)
-        .distinct()
-    )
-    categories = Category.objects.filter(id__in=category_ids, is_active=True).order_by(
-        "name"
-    )
-
-    # Only filter by category if one is explicitly selected
-    if category:
-        try:
-            category_obj = Category.objects.get(id=category, is_active=True)
-            courses = courses.filter(categories=category_obj)
-            category = category_obj.name  # Store name for template
-        except (Category.DoesNotExist, ValueError):
-            # Invalid category UUID - return empty queryset
-            courses = courses.none()
-            category = ""
-
-    # Pagination
-    paginator = Paginator(courses, 3)  # 3 courses per page
-    page_obj = paginator.get_page(page_number)
-
-    # Get enrolled courses for authenticated user
-    enrolled_ids = []
-    if request.user.is_authenticated:
-        enrolled_ids = Enrollment.objects.filter(
-            user=request.user, is_deleted=False
-        ).values_list("course_id", flat=True)
-
-    context = {
-        "courses": page_obj.object_list,
-        "query": query,
-        "category": category,
-        "categories": categories,
-        "enrolled_ids": enrolled_ids,
-        "page_obj": page_obj,
-    }
+    # Build context with filtering, pagination, etc.
+    context = build_course_list_context(request, courses)
 
     return render(request, "courses/course_list.html", context)
 
