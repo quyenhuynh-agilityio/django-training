@@ -1,163 +1,169 @@
 """
 Shared utility functions for course-related views.
+Optimized, documented with INPUT/OUTPUT for clarity.
 """
 
 import uuid
 from django.core.paginator import Paginator
 from courses.models import Course, Category
+from enrollments.models import Enrollment
 
 
 def get_course_filter_params(request):
     """
-    Extract filter params from GET request.
-    Returns: tuple of (query, category, page_number)
+    Extract filter inputs from request.
+
+    INPUT:
+        request (HttpRequest) - GET params:
+            q = search text
+            category = UUID of category
+            page = page number
+
+    OUTPUT:
+        (str query, str category, int page_number)
     """
     query = request.GET.get("q", "").strip()
     category = request.GET.get("category", "").strip()
     page_number = request.GET.get("page", 1)
-
     return query, category, page_number
 
 
 def filter_courses_by_category(courses, category):
     """
-    Filter courses by category if provided.
-    Returns: tuple of (filtered_courses, category_name)
+    Filter courses by active category UUID.
+
+    INPUT:
+        courses (QuerySet[Course])
+        category (str UUID or empty)
+
+    OUTPUT:
+        (
+            QuerySet filtered_courses,
+            str category_name,   # label for UI
+            str category         # returned valid UUID or ""
+        )
     """
     category_name = ""
 
     if category:
         try:
-            # Validate that category is a valid UUID string before querying
-            uuid.UUID(category)  # This will raise ValueError if not a valid UUID
-            category_obj = Category.objects.get(id=category, is_active=True)
+            uuid.UUID(category)  # validate UUID
+            category_obj = Category.objects.only("id", "name").get(
+                id=category, is_active=True
+            )
             courses = courses.filter(categories=category_obj)
-            category_name = category_obj.name  # Store name for template display
+            category_name = category_obj.name
         except (Category.DoesNotExist, ValueError, TypeError):
-            # Invalid category UUID or not a valid UUID format - return empty queryset
             courses = courses.none()
-            category = ""
-            category_name = ""
+            category, category_name = "", ""
 
     return courses, category_name, category
 
 
 def get_categories_for_courses(course_ids=None):
     """
-    Get distinct categories from active courses.
-    If course_ids is provided, only get categories for those courses.
+    Get categories linked to active courses.
+
+    INPUT:
+        course_ids (list[UUID] or None)
+
+    OUTPUT:
+        QuerySet[Category] ordered by name
     """
-    if course_ids is not None:
-        category_ids = (
-            Course.objects.filter(
-                id__in=course_ids, is_active=True, categories__isnull=False
-            )
-            .values_list("categories__id", flat=True)
-            .distinct()
-        )
-    else:
-        category_ids = (
-            Course.objects.filter(is_active=True, categories__isnull=False)
-            .values_list("categories__id", flat=True)
-            .distinct()
-        )
+    qs = Course.objects.filter(is_active=True, categories__isnull=False)
+
+    if course_ids:
+        qs = qs.filter(id__in=course_ids)
+
+    category_ids = qs.values_list("categories__id", flat=True).distinct()
 
     return Category.objects.filter(id__in=category_ids, is_active=True).order_by("name")
 
 
 def get_courses_for_user(user, enrolled_only=False):
     """
-    Get courses based on user authentication and role.
+    Return course list based on user type and mode.
 
-    Args:
-        user: The user object (can be AnonymousUser)
-        enrolled_only: If True, only return enrolled courses
+    INPUT:
+        user (User or AnonymousUser)
+        enrolled_only (bool)
 
-    Returns:
-        QuerySet of courses
+    OUTPUT:
+        QuerySet[Course]
     """
     if enrolled_only:
-        # Only return enrolled courses for authenticated users
         if not user.is_authenticated:
             return Course.objects.none()
 
-        from enrollments.models import Enrollment
-
-        enrolled_course_ids = Enrollment.objects.filter(
-            user=user, is_active=True
-        ).values_list("course_id", flat=True)
+        enrolled_ids = Enrollment.objects.filter(user=user, is_active=True).values_list(
+            "course_id", flat=True
+        )
 
         return Course.objects.filter(
-            id__in=enrolled_course_ids, is_active=True
-        ).prefetch_related("categories")
+            id__in=enrolled_ids, is_active=True
+        ).select_related()
 
-    # For course list page
+    # Normal full list mode -------------------------
+
     if not user.is_authenticated:
-        # Unauthenticated users see all active courses
-        return Course.objects.filter(is_active=True).prefetch_related("categories")
+        return Course.objects.filter(is_active=True).select_related()
 
-    # Authenticated users
     if user.is_staff or user.is_superuser:
-        # Staff and superusers see all courses (active and inactive) for management
-        return Course.objects.all().prefetch_related("categories")
+        return Course.objects.all().select_related()
 
-    # Regular authenticated users see all active courses
-    return Course.objects.filter(is_active=True).prefetch_related("categories")
+    return Course.objects.filter(is_active=True).select_related()
 
 
 def build_course_list_context(request, courses, enrolled_ids=None, page_size=3):
     """
-    Build context dictionary for course list views.
+    Build final context for course list page.
 
-    Args:
-        request: HTTP request object
-        courses: QuerySet of courses
-        enrolled_ids: List of enrolled course IDs (for authenticated users)
-        page_size: Number of courses per page
+    INPUT:
+        request (HttpRequest)
+        courses (QuerySet[Course])
+        enrolled_ids (list[UUID] or None)
+        page_size (int)
 
-    Returns:
-        Dictionary with context for template
+    OUTPUT (dict):
+        {
+            "courses": page_obj.object_list,
+            "query": str,
+            "category": str,
+            "category_name": str,
+            "categories": QuerySet[Category],
+            "enrolled_ids": list[UUID],
+            "page_obj": Paginator.page
+        }
     """
-    # Get filter parameters
     query, category, page_number = get_course_filter_params(request)
 
-    # Apply search filter
     if query:
         courses = courses.filter(title__icontains=query)
 
-    # Filter by category
     courses, category_name, category = filter_courses_by_category(courses, category)
 
-    # Get categories for filter dropdown
-    if enrolled_ids:
-        # For enrolled courses, only show categories from enrolled courses
-        categories = get_categories_for_courses(enrolled_ids)
-    else:
-        # For all courses, show all categories
-        categories = get_categories_for_courses()
+    categories = (
+        get_categories_for_courses(enrolled_ids)
+        if enrolled_ids
+        else get_categories_for_courses()
+    )
 
-    # Pagination
     paginator = Paginator(courses, page_size)
     page_obj = paginator.get_page(page_number)
 
-    # Get enrolled course IDs for authenticated users if not provided
     if enrolled_ids is None and request.user.is_authenticated:
-        from enrollments.models import Enrollment
-
         enrolled_ids = list(
-            Enrollment.objects.filter(user=request.user, is_active=False).values_list(
+            Enrollment.objects.filter(user=request.user, is_active=True).values_list(
                 "course_id", flat=True
             )
         )
-    elif enrolled_ids is None:
-        enrolled_ids = []
 
     return {
         "courses": page_obj.object_list,
         "query": query,
-        "category": category,  # UUID for form submissions
-        "category_name": category_name,  # Name for display
+        "category": category,
+        "category_name": category_name,
         "categories": categories,
-        "enrolled_ids": enrolled_ids,
+        "enrolled_ids": enrolled_ids or [],
         "page_obj": page_obj,
     }

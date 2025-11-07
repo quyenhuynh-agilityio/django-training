@@ -11,9 +11,6 @@ class User(AbstractUser):
         editable=False,  # prevent editing in admin or code
     )
 
-    # Soft-delete flag (instead of removing user permanently from DB)
-    is_active = models.BooleanField(default=True)
-
     class Meta:
         # Custom table name in database instead of default "auth_user"
         db_table = "user"

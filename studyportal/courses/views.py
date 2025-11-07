@@ -1,36 +1,68 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
-from enrollments.models import Enrollment
-from .models import Course
+
 from core.utils import get_courses_for_user, build_course_list_context
+from .models import Course
+from enrollments.models import Enrollment
 
 
-# This ensures Django regenerates a valid CSRF(Cross-Site Request Forgery) token properly.
 @csrf_protect
 def course_list(request):
     """
-    Display course list for all users (authenticated and unauthenticated).
-    Shows courses based on user role and authentication status.
+    Show all courses list page.
+
+    INPUT:
+        request (HttpRequest)
+
+    OUTPUT:
+        Render template: courses/course_list.html
+        Context from build_course_list_context()
     """
-    # Get courses based on user authentication and role
-    courses = get_courses_for_user(request.user, enrolled_only=False)
-
-    # Build context with filtering, pagination, etc.
+    courses = get_courses_for_user(request.user)
     context = build_course_list_context(request, courses)
-
     return render(request, "courses/course_list.html", context)
 
 
 @login_required(login_url="/accounts/login/")
 def enroll_course(request, course_id):
     """
-    Enroll the authenticated user in a course if not already enrolled.
+    Enroll user into course.
+
+    INPUT:
+        course_id (UUID)
+
+    OUTPUT:
+        Redirect to /my-courses/
     """
-    course = get_object_or_404(Course, id=course_id)
+    course = get_object_or_404(Course, id=course_id, is_active=True)
 
     Enrollment.objects.get_or_create(
-        user=request.user, course=course, defaults={"is_active": True}
+        user=request.user,
+        course=course,
+        defaults={"is_active": True},
+    )
+    return redirect("enrolled_courses")
+
+
+@login_required(login_url="/accounts/login/")
+def enrolled_courses(request):
+    """
+    Show only user's enrolled courses.
+
+    INPUT:
+        request (HttpRequest)
+
+    OUTPUT:
+        Render same course_list template, filtered
+    """
+    courses = get_courses_for_user(request.user, enrolled_only=True)
+
+    enrolled_ids = list(
+        Enrollment.objects.filter(user=request.user, is_active=True).values_list(
+            "course_id", flat=True
+        )
     )
 
-    return redirect("enrolled_courses")
+    context = build_course_list_context(request, courses, enrolled_ids=enrolled_ids)
+    return render(request, "courses/course_list.html", context)
