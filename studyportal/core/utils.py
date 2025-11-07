@@ -72,7 +72,9 @@ def get_categories_for_courses(course_ids=None):
     """
     qs = Course.objects.filter(is_active=True, categories__isnull=False)
 
-    if course_ids:
+    if course_ids is not None:
+        if not course_ids:  # Empty list means no courses
+            return Category.objects.none()
         qs = qs.filter(id__in=course_ids)
 
     category_ids = qs.values_list("categories__id", flat=True).distinct()

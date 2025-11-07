@@ -20,6 +20,7 @@ dev = [
     "django-debug-toolbar>=4.4.6",
     "pre-commit>=4.0.1",
     "ruff>=0.8.2",
+    "coverage>=7.0.0",
 ]
 
 [tool.uv]
@@ -29,3 +30,39 @@ default-groups = ["dev"]
 # Enable Pyflakes `E` and `F` codes by default.
 select = ["E", "F"]
 ignore = ["E501", "E741"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/migrations/*",
+    "*/venv/*",
+    "*/env/*",
+    "*/__pycache__/*",
+    "manage.py",
+    "*/settings.py",
+    "*/wsgi.py",
+    "*/asgi.py",
+    "*/tests.py",
+    "*/test_*.py",
+    "*/__init__.py",
+    "*/apps.py",
+    "config/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "if False:",
+    "if 0:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+precision = 2
+show_missing = true
+skip_covered = false
