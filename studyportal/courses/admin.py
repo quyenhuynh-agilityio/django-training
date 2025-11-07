@@ -39,7 +39,9 @@ class CourseAdmin(admin.ModelAdmin):
     # Action: Soft delete selected courses (instead of permanent delete)
     def soft_delete_courses(self, request, queryset):
         # Update selected records setting is_active = False
-        queryset.update(is_active=False)
+        for course in queryset:
+            course.is_active = False
+            course.save()  # triggers post_save signal
 
     # Action label shown in admin UI
-    soft_delete_courses.short_description = "Soft delete selected courses"
+    soft_delete_courses.short_description = "Deactivate selected courses"

@@ -36,8 +36,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Local apps
-    "accounts",
-    "courses",
+    "accounts.apps.AccountsConfig",
+    "courses.apps.CoursesConfig",
     "enrollments",
     "core",
 ]

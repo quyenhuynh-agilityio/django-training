@@ -111,7 +111,9 @@ class UserAdmin(BaseUserAdmin):
     actions = ["deactivate_users"]
 
     def deactivate_users(self, request, queryset):
-        queryset.update(is_active=False)
+        for user in queryset:
+            user.is_active = False
+            user.save()  # triggers post_save signal
 
     deactivate_users.short_description = "Deactivate selected users"
 
