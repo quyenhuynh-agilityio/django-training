@@ -12,7 +12,7 @@ class User(AbstractUser):
     )
 
     # Soft-delete flag (instead of removing user permanently from DB)
-    is_deleted = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         # Custom table name in database instead of default "auth_user"

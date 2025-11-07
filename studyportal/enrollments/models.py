@@ -17,7 +17,7 @@ class Enrollment(models.Model):
         Course, on_delete=models.CASCADE, related_name="enrollments"
     )
     enrolled_at = models.DateTimeField(auto_now_add=True)
-    is_deleted = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         unique_together = ("user", "course")

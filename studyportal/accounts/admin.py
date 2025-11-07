@@ -61,11 +61,11 @@ class UserAdmin(BaseUserAdmin):
         "first_name",
         "last_name",
         "is_staff",
-        "is_deleted",
+        "is_active",
         "last_login",
         "date_joined",
     )
-    list_filter = ("is_staff", "is_superuser", "is_active", "is_deleted", "groups")
+    list_filter = ("is_staff", "is_superuser", "is_active", "groups")
     search_fields = ("username", "email", "first_name", "last_name")
     filter_horizontal = ("groups", "user_permissions")
 
@@ -75,10 +75,17 @@ class UserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {"fields": ("username", "password")}),
         ("Personal Info", {"fields": ("first_name", "last_name", "email")}),
-        ("Status", {"fields": ("is_active", "is_deleted")}),
+        ("Status", {"fields": ("is_active",)}),
         (
             "Permissions",
-            {"fields": ("is_staff", "is_superuser", "groups", "user_permissions")},
+            {
+                "fields": (
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
         ),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
@@ -104,7 +111,9 @@ class UserAdmin(BaseUserAdmin):
     actions = ["deactivate_users"]
 
     def deactivate_users(self, request, queryset):
-        queryset.update(is_deleted=True, is_active=False)
+        for user in queryset:
+            user.is_active = False
+            user.save()  # triggers post_save signal
 
     deactivate_users.short_description = "Deactivate selected users"
 

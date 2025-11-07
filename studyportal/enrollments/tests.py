@@ -18,12 +18,12 @@ class EnrollmentModelTest(TestCase):
             email="student1@example.com",
             password="password123",
         )
-        self.category = Category.objects.create(name="Web Development", is_active=True)
+        self.category = Category.objects.create(name="Web Development", is_active=False)
         self.course = Course.objects.create(
             title="Django Basics",
             course_code="DJ101",
             description="Learn Django",
-            is_active=True,
+            is_active=False,
         )
         self.course.categories.add(self.category)
 
@@ -33,7 +33,7 @@ class EnrollmentModelTest(TestCase):
 
         self.assertEqual(enrollment.user.username, "student1")
         self.assertEqual(enrollment.course.title, "Django Basics")
-        self.assertFalse(enrollment.is_deleted)
+        self.assertFalse(enrollment.is_active)
         self.assertIsInstance(enrollment.id, uuid.UUID)
         self.assertIsNotNone(enrollment.enrolled_at)
 
@@ -46,23 +46,23 @@ class EnrollmentModelTest(TestCase):
     def test_enrollment_soft_delete(self):
         """Test soft deleting an enrollment."""
         enrollment = Enrollment.objects.create(user=self.user, course=self.course)
-        enrollment.is_deleted = True
+        enrollment.is_active = True
         enrollment.save()
 
         enrollment.refresh_from_db()
-        self.assertTrue(enrollment.is_deleted)
+        self.assertTrue(enrollment.is_active)
 
     def test_enrollment_soft_delete_preserves_record(self):
         """Test that soft delete doesn't remove enrollment from database."""
         enrollment = Enrollment.objects.create(user=self.user, course=self.course)
         enrollment_id = enrollment.id
-        enrollment.is_deleted = True
+        enrollment.is_active = False
         enrollment.save()
 
         # Enrollment should still exist in database
         self.assertTrue(Enrollment.objects.filter(id=enrollment_id).exists())
         retrieved_enrollment = Enrollment.objects.get(id=enrollment_id)
-        self.assertTrue(retrieved_enrollment.is_deleted)
+        self.assertTrue(retrieved_enrollment.is_active)
 
     def test_enrollment_string_representation(self):
         """Test enrollment __str__ method."""
@@ -182,32 +182,32 @@ class EnrolledCoursesViewTest(TestCase):
         self.client.login(username="student1", password="password123")
 
         # Create test categories
-        self.web_category = Category.objects.create(name="Web", is_active=True)
+        self.web_category = Category.objects.create(name="Web", is_active=False)
         self.programming_category = Category.objects.create(
-            name="Programming", is_active=True
+            name="Programming", is_active=False
         )
-        self.test_category = Category.objects.create(name="Test", is_active=True)
+        self.test_category = Category.objects.create(name="Test", is_active=False)
 
         # Create test courses
         self.course1 = Course.objects.create(
             title="Django Basics",
             course_code="DJ101",
             description="Learn Django",
-            is_active=True,
+            is_active=False,
         )
         self.course1.categories.add(self.web_category)
         self.course2 = Course.objects.create(
             title="Python Basics",
             course_code="PY101",
             description="Learn Python",
-            is_active=True,
+            is_active=False,
         )
         self.course2.categories.add(self.programming_category)
         self.course3 = Course.objects.create(
             title="React Fundamentals",
             course_code="RE101",
             description="Learn React",
-            is_active=True,
+            is_active=False,
         )
         self.course3.categories.add(self.web_category)
 
@@ -270,7 +270,7 @@ class EnrolledCoursesViewTest(TestCase):
         enrollment2 = Enrollment.objects.create(user=self.user, course=self.course2)
 
         # Soft delete one enrollment
-        enrollment2.is_deleted = True
+        enrollment2.is_active = False
         enrollment2.save()
 
         url = reverse("enrolled_courses")
@@ -306,7 +306,7 @@ class EnrolledCoursesViewTest(TestCase):
         response = self.client.get(url)
         courses = response.context["courses"]
 
-        # Inactive courses are filtered out by is_active=True
+        # Inactive courses are filtered out by is_active=False
         self.assertEqual(len(courses), 0)
 
     def test_enrolled_courses_shows_deleted_courses(self):
@@ -316,7 +316,6 @@ class EnrolledCoursesViewTest(TestCase):
             course_code="DEL101",
             description="Deleted",
             is_active=True,
-            is_deleted=True,
         )
         deleted_course.categories.add(self.test_category)
         Enrollment.objects.create(user=self.user, course=deleted_course)

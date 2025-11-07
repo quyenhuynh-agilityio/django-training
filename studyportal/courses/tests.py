@@ -38,7 +38,7 @@ class CourseModelTest(TestCase):
         self.assertEqual(course.video_url, "https://example.com/video")
         self.assertEqual(course.image_url, "https://example.com/image.jpg")
         self.assertTrue(course.is_active)
-        self.assertFalse(course.is_deleted)
+        self.assertFalse(course.is_active)
         self.assertIsInstance(course.id, uuid.UUID)
 
     def test_course_creation_minimal_fields(self):
@@ -55,16 +55,16 @@ class CourseModelTest(TestCase):
         self.assertIsNone(course.video_url)
         self.assertIsNone(course.image_url)
         self.assertTrue(course.is_active)  # default value
-        self.assertFalse(course.is_deleted)  # default value
+        self.assertFalse(course.is_active)  # default value
 
     def test_course_soft_delete(self):
         """Test soft deleting a course."""
         course = Course.objects.create(**self.course_data)
-        course.is_deleted = True
+        course.is_active = False
         course.save()
 
         course.refresh_from_db()
-        self.assertTrue(course.is_deleted)
+        self.assertTrue(course.is_active)
 
     def test_course_string_representation(self):
         """Test course __str__ method."""
@@ -417,7 +417,7 @@ class CourseListViewTest(TestCase):
         """Test that soft-deleted enrollments are not included in enrolled_ids."""
         course = Course.objects.first()
         enrollment = Enrollment.objects.create(user=self.user, course=course)
-        enrollment.is_deleted = True
+        enrollment.is_active = False
         enrollment.save()
 
         response = self.client.get(reverse("course_list"))
@@ -475,7 +475,7 @@ class EnrollCourseViewTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
             Enrollment.objects.filter(
-                user=self.user, course=self.course, is_deleted=False
+                user=self.user, course=self.course, is_active=True
             ).exists()
         )
 
@@ -508,7 +508,7 @@ class EnrollCourseViewTest(TestCase):
         self.client.get(url)
 
         enrollment = Enrollment.objects.get(user=self.user, course=self.course)
-        self.assertFalse(enrollment.is_deleted)
+        self.assertFalse(enrollment.is_active)
 
     def test_enrollment_nonexistent_course_404(self):
         """Test that enrolling in non-existent course returns 404."""
@@ -545,7 +545,7 @@ class EnrollCourseViewTest(TestCase):
         self.client.login(username="user2", password="pass123")
         self.client.get(url)
 
-        enrollments = Enrollment.objects.filter(course=self.course, is_deleted=False)
+        enrollments = Enrollment.objects.filter(course=self.course, is_active=True)
         self.assertEqual(enrollments.count(), 2)
 
     def test_enrollment_post_method(self):

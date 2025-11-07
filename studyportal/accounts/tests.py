@@ -27,7 +27,7 @@ class UserModelTest(TestCase):
         self.assertEqual(user.email, "student1@example.com")
         self.assertEqual(user.first_name, "John")
         self.assertEqual(user.last_name, "Doe")
-        self.assertFalse(user.is_deleted)
+        self.assertFalse(user.is_active)
         self.assertTrue(user.is_active)
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
@@ -44,7 +44,7 @@ class UserModelTest(TestCase):
         self.assertEqual(user.email, "minimal@example.com")
         self.assertEqual(user.first_name, "")
         self.assertEqual(user.last_name, "")
-        self.assertFalse(user.is_deleted)
+        self.assertFalse(user.is_active)
 
     def test_user_uuid_primary_key(self):
         """Test that user ID is a UUID."""
@@ -59,25 +59,25 @@ class UserModelTest(TestCase):
     def test_user_soft_delete(self):
         """Test soft deleting a user."""
         user = User.objects.create_user(**self.user_data)
-        user.is_deleted = True
+        user.is_active = True
         user.is_active = False
         user.save()
 
         user.refresh_from_db()
-        self.assertTrue(user.is_deleted)
+        self.assertTrue(user.is_active)
         self.assertFalse(user.is_active)
 
     def test_user_soft_delete_preserves_record(self):
         """Test that soft delete doesn't remove the user from database."""
         user = User.objects.create_user(**self.user_data)
         user_id = user.id
-        user.is_deleted = True
+        user.is_active = False
         user.save()
 
         # User should still exist in database
         self.assertTrue(User.objects.filter(id=user_id).exists())
         retrieved_user = User.objects.get(id=user_id)
-        self.assertTrue(retrieved_user.is_deleted)
+        self.assertTrue(retrieved_user.is_active)
 
     def test_create_superuser(self):
         """Test creating a superuser."""
@@ -89,7 +89,7 @@ class UserModelTest(TestCase):
         self.assertTrue(admin.is_superuser)
         self.assertTrue(admin.is_staff)
         self.assertTrue(admin.is_active)
-        self.assertFalse(admin.is_deleted)
+        self.assertFalse(admin.is_active)
         self.assertIsInstance(admin.id, uuid.UUID)
 
     def test_create_superuser_requires_staff(self):
@@ -245,7 +245,7 @@ class UserLoginLogoutViewTest(TestCase):
 
     def test_soft_deleted_user_cannot_login(self):
         """Test that soft-deleted users cannot login."""
-        self.user.is_deleted = True
+        self.user.is_active = True
         self.user.is_active = False
         self.user.save()
 

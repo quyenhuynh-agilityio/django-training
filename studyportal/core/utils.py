@@ -84,7 +84,7 @@ def get_courses_for_user(user, enrolled_only=False):
         from enrollments.models import Enrollment
 
         enrolled_course_ids = Enrollment.objects.filter(
-            user=user, is_deleted=False
+            user=user, is_active=True
         ).values_list("course_id", flat=True)
 
         return Course.objects.filter(
@@ -145,7 +145,7 @@ def build_course_list_context(request, courses, enrolled_ids=None, page_size=3):
         from enrollments.models import Enrollment
 
         enrolled_ids = list(
-            Enrollment.objects.filter(user=request.user, is_deleted=False).values_list(
+            Enrollment.objects.filter(user=request.user, is_active=False).values_list(
                 "course_id", flat=True
             )
         )

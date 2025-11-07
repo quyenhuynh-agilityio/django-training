@@ -15,11 +15,11 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     # Fields to display in the admin list view
-    list_display = ("title", "get_categories", "is_active", "is_deleted", "created_at")
+    list_display = ("title", "get_categories", "is_active", "created_at")
     filter_horizontal = ("categories",)  # Better UI for many-to-many selection
 
     # Filters on the right side panel
-    list_filter = ("categories", "is_active", "is_deleted")
+    list_filter = ("categories", "is_active")
 
     # Searchable fields (top search bar)
     search_fields = ("title", "categories__name")
@@ -38,8 +38,10 @@ class CourseAdmin(admin.ModelAdmin):
 
     # Action: Soft delete selected courses (instead of permanent delete)
     def soft_delete_courses(self, request, queryset):
-        # Update selected records setting is_deleted = True
-        queryset.update(is_deleted=True)
+        # Update selected records setting is_active = False
+        for course in queryset:
+            course.is_active = False
+            course.save()  # triggers post_save signal
 
     # Action label shown in admin UI
-    soft_delete_courses.short_description = "Soft delete selected courses"
+    soft_delete_courses.short_description = "Deactivate selected courses"
