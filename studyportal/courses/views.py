@@ -47,22 +47,12 @@ def enroll_course(request, course_id):
 
 @login_required(login_url="/accounts/login/")
 def enrolled_courses(request):
-    """
-    Show only user's enrolled courses.
-
-    INPUT:
-        request (HttpRequest)
-
-    OUTPUT:
-        Render same course_list template, filtered
-    """
-    courses = get_courses_for_user(request.user, enrolled_only=True)
-
-    enrolled_ids = list(
-        Enrollment.objects.filter(user=request.user, is_active=True).values_list(
-            "course_id", flat=True
+    courses = (
+        get_courses_for_user(request.user)
+        .filter(
+            enrollments__user=request.user, enrollments__is_active=True, is_active=True
         )
+        .distinct()
     )
-
-    context = build_course_list_context(request, courses, enrolled_ids=enrolled_ids)
+    context = build_course_list_context(request, courses)
     return render(request, "courses/course_list.html", context)
