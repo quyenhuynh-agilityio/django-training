@@ -1,4 +1,3 @@
-import uuid
 from django.core.paginator import Paginator
 from django.core.cache import cache
 
@@ -7,22 +6,6 @@ from enrollments.models import Enrollment
 
 DEFAULT_PAGE_SIZE = 3  # Default number of courses per page (small, for better UX)
 CATEGORY_CACHE_KEY = "all_categories"  # Cache key to avoid repeated DB hits
-
-
-def get_courses_for_user(user):
-    # Prefetch related categories in one query to reduce N+1 query problem
-    qs = Course.objects.prefetch_related("categories")
-
-    if not user.is_authenticated:
-        # Only show active courses for anonymous users
-        return qs.filter(is_active=True)
-
-    if user.is_staff or user.is_superuser:
-        # Staff can see all courses, including inactive
-        return qs
-
-    # Regular authenticated users: only active courses
-    return qs.filter(is_active=True)
 
 
 def get_user_enrolled_ids(user):
@@ -38,23 +21,6 @@ def get_user_enrolled_ids(user):
     )
 
 
-def filter_by_category(qs, category_id):
-    if not category_id:
-        # Return unfiltered queryset and empty category info
-        return qs, "", ""
-
-    try:
-        # Validate that the category ID is a valid UUID
-        uuid.UUID(category_id)
-        # Only fetch 'id' and 'name' fields to reduce DB load (optimization)
-        category = Category.objects.only("id", "name").get(id=category_id)
-        # Filter queryset by category (many-to-many relation)
-        return qs.filter(categories=category), category.name, category_id
-    except (ValueError, Category.DoesNotExist, TypeError):
-        # Return empty queryset on invalid input to prevent errors
-        return qs.none(), "", ""
-
-
 def get_all_categories():
     # Try cache first to reduce DB queries (performance)
     categories = cache.get(CATEGORY_CACHE_KEY)
@@ -66,29 +32,76 @@ def get_all_categories():
     return categories
 
 
-def build_course_list_context(request, qs, page_size=DEFAULT_PAGE_SIZE):
-    # -----------------------
-    # Search filter
-    # -----------------------
-    # Get the search query from request and strip whitespace
-    search = request.GET.get("q", "").strip()
-    if search:
-        # Case-insensitive search on title (uses SQL ILIKE on PostgreSQL)
-        qs = qs.filter(title__icontains=search)
+def filter_courses_by_user(courses, user):
+    return (
+        courses
+        if user.is_staff or user.is_superuser
+        else courses.filter(is_active=True)
+    )
 
-    # -----------------------
-    # Category filter
-    # -----------------------
+
+def filter_courses_by_view(courses, view, user):
+    # Convert to match-case if there are more views later
+    return (
+        courses.filter(enrollments__user=user, enrollments__is_active=True).distinct()
+        if view == "enrolled"
+        else courses
+    )
+
+
+def filter_courses_by_search_query(courses, query):
+    # Case-insensitive search on title (uses SQL ILIKE on PostgreSQL)
+    return courses.filter(title__icontains=query) if query else courses
+
+
+def filter_courses_by_category(courses, category_id):
+    return courses.filter(categories__id=category_id) if category_id else courses
+
+
+def get_courses(user, view, query, category_id):
+    courses = Course.objects.prefetch_related("categories")
+
+    # Filter by user type
+    courses = filter_courses_by_user(courses, user)
+
+    # Filter by view
+    courses = filter_courses_by_view(courses, view, user)
+
+    # Filter by search query
+    courses = filter_courses_by_search_query(courses, query)
+
+    # Filter by category
+    courses = filter_courses_by_category(courses, category_id)
+
+    return courses
+
+
+def get_category(category_id):
+    if not category_id:
+        return "", ""
+    return Category.objects.filter(id=category_id).values_list(
+        "name", "id"
+    ).first() or ("", "")
+
+
+def build_course_list_context(request, view="all", page_size=DEFAULT_PAGE_SIZE):
+    # view: "all" or "enrolled" -> can be extended later if there are more views
+
+    search_query = request.GET.get("q", "").strip()
     category_id = request.GET.get("category", "").strip()
-    # Reuse filtering helper for category (single responsibility)
-    qs, category_name, selected_category = filter_by_category(qs, category_id)
+
+    # Get courses - filtered by criteria
+    courses = get_courses(request.user, view, search_query, category_id)
+
+    # Get category
+    category_name, selected_category = get_category(category_id)
 
     # -----------------------
     # Pagination
     # -----------------------
     page_number = request.GET.get("page", 1)
     # Paginator handles slicing efficiently (no need to manually slice queryset)
-    paginator = Paginator(qs, page_size)
+    paginator = Paginator(courses, page_size)
     # Get page object safely (handles invalid page numbers)
     page_obj = paginator.get_page(page_number)
 
@@ -98,7 +111,7 @@ def build_course_list_context(request, qs, page_size=DEFAULT_PAGE_SIZE):
     return {
         "courses": page_obj.object_list,  # List of courses for current page
         "page_obj": page_obj,  # Full pagination info for templates
-        "query": search,  # The search query string
+        "query": search_query,  # The search query string
         "category": selected_category,  # Selected category ID
         "category_name": category_name,  # Selected category name
         "categories": get_all_categories(),  # All categories cached
