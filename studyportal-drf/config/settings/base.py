@@ -31,10 +31,10 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_spectacular',
     # Local apps
-    'apps.accounts.apps.AccountsConfig',
-    'apps.courses.apps.CoursesConfig',
-    'apps.categories.apps.CategoriesConfig',
-    'apps.enrollments.apps.EnrollmentsConfig',
+    'accounts.apps.AccountsConfig',
+    'courses.apps.CoursesConfig',
+    'categories.apps.CategoriesConfig',
+    'enrollments.apps.EnrollmentsConfig',
 ]
 
 MIDDLEWARE = [

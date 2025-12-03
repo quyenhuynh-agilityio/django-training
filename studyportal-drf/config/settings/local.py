@@ -1,5 +1,6 @@
 # config/settings/local.py
-from .base import *
+from .base import *  # noqa: F403
+from .base import INSTALLED_APPS, MIDDLEWARE, REST_FRAMEWORK
 
 DEBUG = True
 
