@@ -1,0 +1,157 @@
+[project]
+name = "studyportal-drf"
+version = "0.1.0"
+description = "Student Course Management System REST API"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Quyen Huynh", email = "quyen.huynh@asnet.com.vn"}
+]
+keywords = ["django", "rest-api", "education", "course-management"]
+
+dependencies = [
+    # Core Django
+    "django>=5.1.4",
+    "djangorestframework>=3.15.2",
+
+    # Database - PostgreSQL (production default)
+    "psycopg2-binary>=2.9.9",
+
+    # Environment variables
+    "django-environ>=0.11.2",
+
+    # Authentication
+    "djangorestframework-simplejwt>=5.3.1",
+
+    # CORS (for mobile app)
+    "django-cors-headers>=4.3.1",
+
+    # Filtering and search
+    "django-filter>=23.5",
+
+    # API Documentation
+    "drf-spectacular>=0.27.0",
+]
+
+[dependency-groups]
+dev = [
+    # Development tools
+    "django-debug-toolbar>=4.4.6",
+    "pre-commit>=4.0.1",
+    "ruff>=0.8.2",
+    "ipython>=8.18.1",
+
+    # Testing
+    "pytest>=7.4.3",
+    "pytest-django>=4.7.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.5.0",
+    "factory-boy>=3.3.0",
+    "faker>=20.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/studyportal-drf"
+Documentation = "https://github.com/yourusername/studyportal-drf#readme"
+Repository = "https://github.com/yourusername/studyportal-drf"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+testpaths = ["tests"]
+addopts = [
+    "--reuse-db",
+    "--nomigrations",
+    "--cov=apps",
+    "--cov=api",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "-v",
+]
+
+[tool.coverage.run]
+source = ["apps", "api"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__init__.py",
+    "*/apps.py",
+    "*/admin.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "def __str__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if settings.DEBUG:",
+    "pass",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "*/migrations/*",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "DJ",  # flake8-django
+]
+
+ignore = [
+    "E501",  # line too long
+    "E741",  # ambiguous variable name
+]
+
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"src/config/settings/*.py" = ["F405", "F403"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "api", "config"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "django",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.isort.sections]
+django = ["django", "rest_framework"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+line-ending = "lf"
