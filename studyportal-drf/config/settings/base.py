@@ -1,22 +1,36 @@
-# config/settings/base.py
 import secrets
 from datetime import timedelta
 from pathlib import Path
 
 import environ
 
-# Initialize environ
+# ==============================
+# ENVIRONMENT
+# ==============================
 env = environ.Env(DEBUG=(bool, False))
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Read .env file
-environ.Env.read_env(BASE_DIR / '.env')
+ENV_FILE = BASE_DIR / '.env'
+if ENV_FILE.exists():
+    environ.Env.read_env(ENV_FILE)
 
 SECRET_KEY = env('SECRET_KEY', default=secrets.token_urlsafe(50))
-DEBUG = env('DEBUG')
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
+DEBUG = env('DEBUG')
+
+ALLOWED_HOSTS = env.list(
+    'ALLOWED_HOSTS',
+    default=[
+        'localhost',
+        '127.0.0.1',
+    ],
+)
+
+# ==============================
+# INSTALLED APPS
+# ==============================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -24,19 +38,22 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Third-party apps
+    # Third-party
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
     'drf_spectacular',
     # Local apps
-    'apps.accounts.apps.AccountsConfig',
-    'apps.courses.apps.CoursesConfig',
-    'apps.categories.apps.CategoriesConfig',
-    'apps.enrollments.apps.EnrollmentsConfig',
+    'accounts.apps.AccountsConfig',
+    'courses.apps.CoursesConfig',
+    'categories.apps.CategoriesConfig',
+    'enrollments.apps.EnrollmentsConfig',
 ]
 
+# ==============================
+# MIDDLEWARE
+# ==============================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -50,6 +67,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
+# ==============================
+# TEMPLATES
+# ==============================
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -68,7 +88,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database - PostgreSQL (default)
+# ==============================
+# DATABASE
+# ==============================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -80,6 +102,11 @@ DATABASES = {
     }
 }
 
+# ==============================
+# AUTH & PASSWORDS
+# ==============================
+AUTH_USER_MODEL = 'accounts.User'
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -87,28 +114,38 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# ==============================
+# TIMEZONE
+# ==============================
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# ==============================
+# STATIC & MEDIA
+# ==============================
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Prevent crash if static folder missing
+STATICFILES_DIRS = [d for d in [BASE_DIR / 'static'] if d.exists()]
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-AUTH_USER_MODEL = 'accounts.User'
-
+# ==============================
+# DRF CONFIG
+# ==============================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
+    # Allow public access by default
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
@@ -126,16 +163,20 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
+# ==============================
+# JWT
+# ==============================
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=env.int('JWT_ACCESS_TOKEN_LIFETIME', default=60)),
-    'REFRESH_TOKEN_LIFETIME': timedelta(
-        minutes=env.int('JWT_REFRESH_TOKEN_LIFETIME', default=10080)
-    ),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=env.int('JWT_REFRESH_TOKEN_LIFETIME_DAYS', default=7)),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
+# ==============================
+# CORS
+# ==============================
 CORS_ALLOWED_ORIGINS = env.list(
     'CORS_ALLOWED_ORIGINS',
     default=[
@@ -145,6 +186,9 @@ CORS_ALLOWED_ORIGINS = env.list(
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# ==============================
+# API Documentation
+# ==============================
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Student Course Management API',
     'DESCRIPTION': 'API for managing student course enrollments',
@@ -152,11 +196,11 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-# API Configuration
-API_ROOT_ENDPOINT = env('API_ROOT_ENDPOINT', default='api/v1/')
-DOMAIN = env('DOMAIN', default='http://localhost:8000')
-
+# ==============================
+# EMAIL
+# ==============================
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+
 EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
