@@ -759,6 +759,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "coverage" },
     { name = "django-debug-toolbar" },
     { name = "factory-boy" },
     { name = "faker" },
@@ -785,6 +786,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "coverage", specifier = ">=7.12.0" },
     { name = "django-debug-toolbar", specifier = ">=4.4.6" },
     { name = "factory-boy", specifier = ">=3.3.0" },
     { name = "faker", specifier = ">=20.1.0" },
