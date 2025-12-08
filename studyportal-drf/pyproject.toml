@@ -12,7 +12,7 @@ keywords = ["django", "rest-api", "education", "course-management"]
 
 dependencies = [
     # Core Django
-    "django>=5.1.4",
+    "django==5.1.5",
     "djangorestframework>=3.15.2",
     # Database - PostgreSQL (production default)
     "psycopg2-binary>=2.9.9",
