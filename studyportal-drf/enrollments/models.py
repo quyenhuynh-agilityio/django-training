@@ -78,7 +78,7 @@ class Enrollment(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
-    def drop(self):
+    def unenroll(self):
         """
         Called when student leaves course.
         Used in: Student mobile app, API endpoint.
