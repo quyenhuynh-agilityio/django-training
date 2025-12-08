@@ -1,18 +1,18 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
-from rest_framework import generics, serializers, status, viewsets
+from rest_framework import generics, serializers, viewsets
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api_views import CommonViewSet
 from courses.api.permissions import IsStudent
 from enrollments.models import Enrollment
 
 from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer
 
 
-class StudentEnrolledCoursesViewSet(viewsets.ReadOnlyModelViewSet):
+class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
     """
     Student Enrolled Courses ViewSet
 
@@ -64,7 +64,7 @@ class StudentEnrolledCoursesViewSet(viewsets.ReadOnlyModelViewSet):
         return super().retrieve(request, *args, **kwargs)
 
 
-class EnrollInCourseView(generics.CreateAPIView):
+class EnrollInCourseView(CommonViewSet, generics.CreateAPIView):
     """
     Enroll in Course API
 
@@ -117,22 +117,18 @@ class EnrollInCourseView(generics.CreateAPIView):
 
             # Return full enrollment details
             output_serializer = EnrollmentSerializer(enrollment)
-            return Response(
+            return self.created(
                 {
                     'message': 'Successfully enrolled in course',
                     'enrollment': output_serializer.data,
-                },
-                status=status.HTTP_201_CREATED,
+                }
             )
 
         except serializers.ValidationError as e:
-            return Response(
-                {'message': 'Enrollment failed', 'errors': e.detail},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return self.bad_request(message='Enrollment failed', code=e.detail)
 
 
-class LeaveCourseView(APIView):
+class LeaveCourseView(CommonViewSet, APIView):
     """
     Leave Course API
 
@@ -165,10 +161,7 @@ class LeaveCourseView(APIView):
             # Unenroll
             enrollment.unenroll()
 
-            return Response({'message': 'Successfully left the course'}, status=status.HTTP_200_OK)
+            return self.ok({'message': 'Successfully left the course'})
 
         except Enrollment.DoesNotExist:
-            return Response(
-                {'error': 'Enrollment not found or already inactive'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return self.not_found()

@@ -2,11 +2,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from django.db.models import Count, Q
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.response import Response
 
+from core.api_views import CommonViewSet
 from courses.models import Course
 from enrollments.api.serializers import EnrollmentSerializer
 from enrollments.models import Enrollment
@@ -16,7 +16,7 @@ from .permissions import IsInstructorOrReadOnly
 from .serializers import CourseCreateUpdateSerializer, CourseDetailSerializer, CourseListSerializer
 
 
-class CourseViewSet(viewsets.ModelViewSet):
+class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     """
     Course ViewSet - Full CRUD operations
 
@@ -152,10 +152,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         # Check if user is course instructor
         if course.instructor != request.user:
-            return Response(
-                {'error': 'Only course instructor can view enrolled students.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return self.forbidden({'error': 'Only course instructor can view enrolled students.'})
 
         enrollments = Enrollment.objects.filter(course=course, is_active=True).select_related(
             'student'
@@ -168,4 +165,4 @@ class CourseViewSet(viewsets.ModelViewSet):
             return self.get_paginated_response(serializer.data)
 
         serializer = EnrollmentSerializer(enrollments, many=True)
-        return Response(serializer.data)
+        return self.ok(serializer.data)

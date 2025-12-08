@@ -12,6 +12,8 @@ from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api_views import CommonViewSet
+
 from .serializers import (
     ChangePasswordSerializer,
     PasswordResetConfirmSerializer,
@@ -25,7 +27,7 @@ from .serializers import (
 User = get_user_model()
 
 
-class UserRegistrationView(generics.CreateAPIView):
+class UserRegistrationView(CommonViewSet, generics.CreateAPIView):
     """
     Student Registration API
 
@@ -89,7 +91,7 @@ class UserRegistrationView(generics.CreateAPIView):
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
 
-            return Response(
+            return self.created(
                 {
                     'message': 'Registration successful. Please login.',
                     'user': {
@@ -100,14 +102,12 @@ class UserRegistrationView(generics.CreateAPIView):
                         'last_name': user.last_name,
                         'role': user.role,
                     },
-                },
-                status=status.HTTP_201_CREATED,
+                }
             )
 
         except serializers.ValidationError as e:
-            return Response(
-                {'message': 'Registration failed. Please check your input.', 'errors': e.detail},
-                status=status.HTTP_400_BAD_REQUEST,
+            return self.bad_request(
+                message='Registration failed. Please check your input.', code=e.detail
             )
 
         except Exception as e:
@@ -117,7 +117,7 @@ class UserRegistrationView(generics.CreateAPIView):
             )
 
 
-class UserLoginView(APIView):
+class UserLoginView(CommonViewSet, APIView):
     """
     User Login API
 
@@ -188,7 +188,7 @@ class UserLoginView(APIView):
             # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
 
-            return Response(
+            return self.ok(
                 {
                     'message': 'Login successful',
                     'access_token': str(refresh.access_token),
@@ -200,14 +200,11 @@ class UserLoginView(APIView):
                         'full_name': user.full_name,
                         'role': user.role,
                     },
-                },
-                status=status.HTTP_200_OK,
+                }
             )
 
         except serializers.ValidationError as e:
-            return Response(
-                {'message': 'Login failed', 'errors': e.detail}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return self.bad_request(message='Login failed', code=e.detail)
 
         except Exception as e:
             return Response(
@@ -216,7 +213,7 @@ class UserLoginView(APIView):
             )
 
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestView(CommonViewSet, APIView):
     """
     Password Reset Request API
 
@@ -257,10 +254,7 @@ class PasswordResetRequestView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
 
         if not serializer.is_valid():
-            return Response(
-                {'message': 'Invalid email format', 'errors': serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return self.bad_request(message='Invalid email format', code=serializer.errors)
 
         email = serializer.validated_data['email']
 
@@ -293,15 +287,14 @@ class PasswordResetRequestView(APIView):
             pass
 
         # Always return success (security measure)
-        return Response(
+        return self.ok(
             {
                 'message': 'If an account exists with this email, a password reset link has been sent.'
-            },
-            status=status.HTTP_200_OK,
+            }
         )
 
 
-class PasswordResetConfirmView(APIView):
+class PasswordResetConfirmView(CommonViewSet, APIView):
     """
     Password Reset Confirmation API
 
@@ -364,18 +357,14 @@ class PasswordResetConfirmView(APIView):
             user.set_password(new_password)
             user.save()
 
-            return Response(
+            return self.ok(
                 {
                     'message': 'Password has been reset successfully. You can now login with your new password.'
-                },
-                status=status.HTTP_200_OK,
+                }
             )
 
         except serializers.ValidationError as e:
-            return Response(
-                {'message': 'Password reset failed', 'errors': e.detail},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return self.bad_request(message='Password reset failed', code=e.detail)
 
         except Exception as e:
             return Response(
@@ -384,7 +373,7 @@ class PasswordResetConfirmView(APIView):
             )
 
 
-class ChangePasswordView(APIView):
+class ChangePasswordView(CommonViewSet, APIView):
     """
     Change Password API (Authenticated)
 
@@ -442,28 +431,21 @@ class ChangePasswordView(APIView):
 
             # Check old password
             if not user.check_password(old_password):
-                return Response(
-                    {
-                        'message': 'Password change failed',
-                        'errors': {'old_password': ['Wrong password.']},
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
+                return self.bad_request(
+                    message='Password change failed', code={'old_password': ['Wrong password.']}
                 )
 
             # Set new password
             user.set_password(new_password)
             user.save()
 
-            return Response({'message': 'Password changed successfully'}, status=status.HTTP_200_OK)
+            return self.ok({'message': 'Password changed successfully'})
 
         except serializers.ValidationError as e:
-            return Response(
-                {'message': 'Password change failed', 'errors': e.detail},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return self.bad_request(message='Password change failed', code=e.detail)
 
 
-class UserLogoutView(APIView):
+class UserLogoutView(CommonViewSet, APIView):
     """
     User Logout API (Optional - Token Blacklisting)
 
@@ -516,29 +498,25 @@ class UserLogoutView(APIView):
             refresh_token = request.data.get('refresh')
 
             if not refresh_token:
-                return Response(
-                    {'message': 'Logout failed', 'error': 'Refresh token is required'},
-                    status=status.HTTP_400_BAD_REQUEST,
+                return self.bad_request(
+                    message='Logout failed', code={'error': 'Refresh token is required'}
                 )
 
             token = RefreshToken(refresh_token)
             token.blacklist()
 
-            return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+            return self.ok({'message': 'Logout successful'})
 
         except TokenError:
-            return Response(
-                {'message': 'Logout failed', 'error': 'Token is invalid or expired'},
-                status=status.HTTP_400_BAD_REQUEST,
+            return self.bad_request(
+                message='Logout failed', code={'error': 'Token is invalid or expired'}
             )
 
         except Exception as e:
-            return Response(
-                {'message': 'Logout failed', 'error': str(e)}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return self.bad_request(message='Logout failed', code={'error': str(e)})
 
 
-class UserProfileView(generics.RetrieveUpdateAPIView):
+class UserProfileView(CommonViewSet, generics.RetrieveUpdateAPIView):
     """
     User Profile API
 
