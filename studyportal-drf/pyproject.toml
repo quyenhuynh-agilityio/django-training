@@ -79,6 +79,11 @@ omit = [
     "*/__init__.py",
     "*/apps.py",
     "*/admin.py",
+    "config/wsgi.py",
+    "config/asgi.py",
+    "manage.py",
+    "config/settings/local.py",
+    "config/settings/production.py",
 ]
 
 [tool.coverage.report]

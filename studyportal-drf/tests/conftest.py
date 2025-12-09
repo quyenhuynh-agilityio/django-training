@@ -1,7 +1,13 @@
+import uuid
+
 import pytest
 
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
+
+from categories.models import Category
+from courses.models import Course
+from enrollments.models import Enrollment
 
 
 @pytest.fixture
@@ -34,3 +40,64 @@ def create_user():
         return user
 
     return _create_user
+
+
+@pytest.fixture
+def create_category():
+    """Factory to create categories."""
+
+    def _create_category(name=None, **extra):
+        return Category.objects.create(name=name or f'Category-{uuid.uuid4().hex[:8]}', **extra)
+
+    return _create_category
+
+
+@pytest.fixture
+def create_course(create_user, create_category):
+    """Factory to create courses with default active instructor."""
+
+    def _create_course(
+        title='Sample Course',
+        course_code='CRS101',
+        instructor=None,
+        status=Course.STATUS_ACTIVE,
+        is_active=True,
+        max_students=None,
+        categories=None,
+        **extra,
+    ):
+        instructor = instructor or create_user(
+            email=f'instructor-{uuid.uuid4().hex[:6]}@example.com',
+            username=f'instructor-{uuid.uuid4().hex[:6]}',
+            role='instructor',
+        )
+        course = Course.objects.create(
+            title=title,
+            course_code=course_code,
+            instructor=instructor,
+            status=status,
+            is_active=is_active,
+            max_students=max_students,
+            **extra,
+        )
+        if categories:
+            course.categories.set(categories)
+        return course
+
+    return _create_course
+
+
+@pytest.fixture
+def create_enrollment(create_user, create_course):
+    """Factory to create enrollments."""
+
+    def _create_enrollment(student=None, course=None, **extra):
+        student = student or create_user(
+            email=f'student-{uuid.uuid4().hex[:6]}@example.com',
+            username=f'student-{uuid.uuid4().hex[:6]}',
+            role='student',
+        )
+        course = course or create_course()
+        return Enrollment.objects.create(student=student, course=course, **extra)
+
+    return _create_enrollment

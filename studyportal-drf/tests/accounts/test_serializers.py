@@ -51,6 +51,38 @@ def test_registration_serializer_rejects_duplicate_email(create_user):
     assert 'email' in serializer.errors
 
 
+def test_registration_serializer_rejects_bad_username():
+    serializer = UserRegistrationSerializer(
+        data={
+            'email': 'newbad@example.com',
+            'username': 'bad username!',
+            'first_name': 'New',
+            'last_name': 'User',
+            'password': 'StrongPass123',
+            'password_confirm': 'StrongPass123',
+        }
+    )
+
+    assert serializer.is_valid() is False
+    assert 'username' in serializer.errors
+
+
+def test_registration_serializer_requires_matching_passwords():
+    serializer = UserRegistrationSerializer(
+        data={
+            'email': 'mismatch@example.com',
+            'username': 'mismatchuser',
+            'first_name': 'New',
+            'last_name': 'User',
+            'password': 'StrongPass123',
+            'password_confirm': 'OtherPass123',
+        }
+    )
+
+    assert serializer.is_valid() is False
+    assert 'password' in serializer.errors
+
+
 def test_login_serializer_validates_credentials(create_user):
     user = create_user(email='login@example.com', username='loginuser', password='StrongPass123')
 
@@ -72,6 +104,15 @@ def test_login_serializer_rejects_inactive_user(create_user):
     serializer = UserLoginSerializer(
         data={'email': 'inactive@example.com', 'password': 'StrongPass123'}
     )
+    with pytest.raises(serializers.ValidationError):
+        serializer.is_valid(raise_exception=True)
+
+
+def test_login_serializer_rejects_invalid_credentials():
+    serializer = UserLoginSerializer(
+        data={'email': 'missing@example.com', 'password': 'WrongPass123'}
+    )
+
     with pytest.raises(serializers.ValidationError):
         serializer.is_valid(raise_exception=True)
 
