@@ -1,4 +1,3 @@
-# Register your models here.
 from django.contrib import admin
 from django.utils.html import format_html
 
@@ -80,7 +79,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
     def is_active_badge(self, obj):
         """Display active status"""
         if obj.is_active:
-            return format_html('<span style="color: green;">● Active</span>')
-        return format_html('<span style="color: red;">● Inactive</span>')
+            return format_html('<span style="color: green;">Active</span>')
+        return format_html('<span style="color: red;">Inactive</span>')
 
     is_active_badge.short_description = 'Active'

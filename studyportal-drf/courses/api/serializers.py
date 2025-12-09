@@ -183,6 +183,26 @@ class CourseCreateUpdateSerializer(serializers.ModelSerializer):
 
         return course
 
+    def validate(self, attrs):
+        """Validate course update - prevent disabling in-progress courses with students"""
+        if self.instance:
+            # Check if trying to disable a course
+            is_active = attrs.get('is_active', self.instance.is_active)
+            if self.instance.is_active and not is_active:
+                # Check if course is currently in progress with enrolled students
+                if (
+                    self.instance.status == Course.STATUS_IN_PROGRESS
+                    and self.instance.enrolled_count > 0
+                ):
+                    raise serializers.ValidationError(
+                        {
+                            'is_active': (
+                                'Cannot disable a course that is in progress with enrolled students.'
+                            )
+                        }
+                    )
+        return attrs
+
     def update(self, instance, validated_data):
         """Update course with categories"""
         category_ids = validated_data.pop('category_ids', None)

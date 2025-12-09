@@ -174,25 +174,6 @@ class UserLoginSerializer(serializers.Serializer):
         return attrs
 
 
-class TokenResponseSerializer(serializers.Serializer):
-    """Serializer for token response"""
-
-    access_token = serializers.CharField(help_text='Access token')
-    refresh_token = serializers.CharField(help_text='Refresh token')
-    user = serializers.SerializerMethodField()
-
-    def get_user(self, obj):
-        """Return user info"""
-        user = obj.get('user')
-        return {
-            'id': str(user.id),
-            'email': user.email,
-            'username': user.username,
-            'full_name': user.full_name,
-            'role': user.role,
-        }
-
-
 class PasswordResetRequestSerializer(serializers.Serializer):
     """
     Password Reset Request Serializer

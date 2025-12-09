@@ -18,11 +18,9 @@ def test_full_name_falls_back_to_email_prefix(create_user):
 def test_role_helpers(create_user):
     student = create_user(email='s@example.com', username='student1', role='student')
     instructor = create_user(email='i@example.com', username='instructor1', role='instructor')
-    admin = create_user(email='a@example.com', username='admin1', role='admin')
 
     assert student.is_student() is True
     assert instructor.is_instructor() is True
-    assert admin.is_admin_user() is True
 
 
 def test_clean_lowercases_email(create_user):

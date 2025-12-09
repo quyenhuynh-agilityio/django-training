@@ -1,7 +1,5 @@
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, ViewSet
 
 
 class CommonViewSet:
@@ -27,12 +25,6 @@ class CommonViewSet:
             data = {'success': True}
 
         return Response(data=data, status=status.HTTP_201_CREATED)
-
-    def no_content(self) -> Response:
-        """
-        Default response no content. Status code is 204
-        """
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def not_found(self) -> Response:
         """
@@ -65,37 +57,3 @@ class CommonViewSet:
         }
 
         return Response(data=response_data, status=status.HTTP_400_BAD_REQUEST)
-
-    def not_implemented(self):
-        """
-        Return not implemented response
-        """
-        return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
-
-
-class AuthenticatedViewSet:
-    permission_classes = [IsAuthenticated]
-
-
-class BaseViewSet(ViewSet, CommonViewSet):
-    """
-    Base view set for views accept DTO data rather than Django model
-    """
-
-
-class BaseModelViewSet(ModelViewSet, CommonViewSet):
-    """
-    Base view set for Django model
-    """
-
-
-class BaseAuthenticatedViewSet(BaseViewSet, AuthenticatedViewSet):
-    """
-    Base view set with authentication
-    """
-
-
-class BaseAuthenticatedModelViewSet(BaseModelViewSet, AuthenticatedViewSet):
-    """
-    Base view set for Django model with authentication
-    """

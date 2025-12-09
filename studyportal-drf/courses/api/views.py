@@ -130,11 +130,26 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
     @extend_schema(
         summary='Delete course',
-        description='Delete course (course instructor only)',
+        description='Soft delete course (course instructor only). Cannot delete if course is in progress with enrolled students.',
         tags=['Courses'],
     )
     def destroy(self, request, *args, **kwargs):
-        return super().destroy(request, *args, **kwargs)
+        """
+        Soft delete a course.
+        Prevents deletion if course is in progress and has enrolled students.
+        """
+        course = self.get_object()
+
+        # Check if course is in progress and has enrolled students
+        if course.status == Course.STATUS_IN_PROGRESS and course.enrolled_count > 0:
+            return self.bad_request(
+                message='Cannot delete a course that is in progress with enrolled students.',
+                code='COURSE_IN_PROGRESS_WITH_STUDENTS',
+            )
+
+        # Perform soft delete
+        course.soft_delete()
+        return self.ok({'message': 'Course deleted successfully.'})
 
     @action(
         detail=True,

@@ -1,4 +1,3 @@
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 
 from rest_framework import permissions, viewsets
@@ -22,8 +21,7 @@ class CategoryViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.filter(is_active=True)
     serializer_class = CategorySerializer
     permission_classes = [permissions.AllowAny]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['is_active']
+    filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['name']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']

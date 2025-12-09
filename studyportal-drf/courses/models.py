@@ -29,7 +29,6 @@ class Course(models.Model):
     title = models.CharField(max_length=255, help_text='Public course title')
     course_code = models.CharField(
         max_length=20,
-        unique=True,
         db_index=True,
         help_text='Human-readable unique code: PY101, WEB202, etc.',
     )
@@ -77,7 +76,9 @@ class Course(models.Model):
     )
 
     is_active = models.BooleanField(
-        default=True, db_index=True, help_text='Quick toggle to show/hide course'
+        default=True,
+        db_index=True,
+        help_text='Quick toggle to show/hide course. Set to False for soft delete.',
     )
 
     max_students = models.PositiveIntegerField(
@@ -117,13 +118,6 @@ class Course(models.Model):
         """
         return self.is_active and self.status == self.STATUS_ACTIVE and not self.is_full
 
-    def can_disable(self):
-        """
-        Business rule from your requirements:
-        "Instructors can not disable a course if it is in progress and has students"
-        """
-        return not (self.status == self.STATUS_IN_PROGRESS and self.enrolled_count > 0)
-
     # ─── Model Validation (Prevents Bad Data) ───────────────────
     def clean(self):
         # Only real instructors can be assigned
@@ -148,3 +142,13 @@ class Course(models.Model):
     def save(self, *args, **kwargs):  # noqa: DJ012
         self.full_clean()
         super().save(*args, **kwargs)
+
+    def soft_delete(self):
+        """Soft delete the course by setting is_active to False"""
+        self.is_active = False
+        self.save(update_fields=['is_active', 'updated_at'])
+
+    @property
+    def is_deleted(self):
+        """Check if course is soft-deleted"""
+        return not self.is_active

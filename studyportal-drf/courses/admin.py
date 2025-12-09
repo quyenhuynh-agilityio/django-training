@@ -71,11 +71,11 @@ class CourseAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'updated_at']
 
     def get_queryset(self, request):
-        """Optimize queries with annotations"""
+        """Optimize Course admin queryset."""
+        base_queryset = super().get_queryset(request)
+
         return (
-            super()
-            .get_queryset(request)
-            .select_related('instructor')
+            base_queryset.select_related('instructor')
             .prefetch_related('categories', 'enrollments')
             .annotate(enrollment_count=Count('enrollments', filter=Q(enrollments__is_active=True)))
         )
@@ -175,7 +175,7 @@ class CourseAdmin(admin.ModelAdmin):
         if updated:
             self.message_user(request, f'{updated} course(s) deactivated.', level='success')
 
-    deactivate_courses.short_description = '✗ Deactivate courses'
+    deactivate_courses.short_description = 'Deactivate courses'
 
     def set_to_active_status(self, request, queryset):
         """Bulk action: Set status to active"""

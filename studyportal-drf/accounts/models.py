@@ -82,10 +82,6 @@ class User(AbstractUser):
         """Check if user is an instructor"""
         return self.role == 'instructor'
 
-    def is_admin_user(self):
-        """Check if user is an admin"""
-        return self.role == 'admin' or self.is_staff or self.is_superuser
-
     def clean(self):
         """Model-level validation"""
         super().clean()

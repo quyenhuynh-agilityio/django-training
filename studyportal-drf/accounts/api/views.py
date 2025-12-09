@@ -18,7 +18,6 @@ from .serializers import (
     ChangePasswordSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
-    TokenResponseSerializer,
     UserLoginSerializer,
     UserProfileSerializer,
     UserRegistrationSerializer,
@@ -142,7 +141,6 @@ class UserLoginView(CommonViewSet, APIView):
         request=UserLoginSerializer,
         responses={
             200: OpenApiResponse(
-                response=TokenResponseSerializer,
                 description='Login successful',
                 examples=[
                     OpenApiExample(

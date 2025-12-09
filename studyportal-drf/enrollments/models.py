@@ -58,7 +58,7 @@ class Enrollment(models.Model):
         ]
 
     def __str__(self):
-        return f'{self.student.email} → {self.course.title}'
+        return f'{self.student.email} to {self.course.title}'
 
     def clean(self):
         # 1. Only students can enroll
@@ -69,7 +69,7 @@ class Enrollment(models.Model):
         if not self.course.can_enroll():
             if not self.course.is_active:
                 raise ValidationError('This course is not active.')
-            if self.course.status != 'active':
+            if self.course.status == self.STATUS_DROPPED:
                 raise ValidationError('This course is not open for enrollment.')
             if self.course.is_full:
                 raise ValidationError('This course has reached maximum capacity.')
