@@ -8,7 +8,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 
 from core.api_views import CommonViewSet
 from courses.models import Course
-from enrollments.api.serializers import EnrollmentSerializer
+from enrollments.api.serializers import EnrolledStudentSerializer
 from enrollments.models import Enrollment
 
 from .filters import CourseFilter
@@ -25,6 +25,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     Create: POST /api/v1/courses/ - Instructors only
     Update: PUT/PATCH /api/v1/courses/{id}/ - Course instructor only
     Delete: DELETE /api/v1/courses/{id}/ - Course instructor only
+    Enrolled Students: GET /api/v1/courses/{id}/enrolled-students/ - Course instructor only
 
     Filters:
     - ?category={uuid} - Filter by category
@@ -151,17 +152,25 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         course.soft_delete()
         return self.ok({'message': 'Course deleted successfully.'})
 
+    @extend_schema(
+        summary='Get enrolled students',
+        description='Get paginated list of all enrolled students in a course. Only accessible by the course instructor.',
+        tags=['Courses'],
+        responses={200: EnrolledStudentSerializer(many=True)},
+    )
     @action(
         detail=True,
         methods=['get'],
         permission_classes=[permissions.IsAuthenticated, IsInstructorOrReadOnly],
+        url_path='enrolled-students',
     )
     def enrolled_students(self, request, pk=None):
         """
         Get enrolled students for a course
-        GET /api/v1/courses/{id}/enrolled_students/
+        GET /api/v1/courses/{id}/enrolled-students/
 
         Only accessible by course instructor
+        Returns paginated list of enrolled students with their details.
         """
         course = self.get_object()
 
@@ -169,15 +178,17 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         if course.instructor != request.user:
             return self.forbidden({'error': 'Only course instructor can view enrolled students.'})
 
-        enrollments = Enrollment.objects.filter(course=course, is_active=True).select_related(
-            'student'
+        enrollments = (
+            Enrollment.objects.filter(course=course, is_active=True)
+            .select_related('student')
+            .order_by('-created_at')
         )
 
         # Pagination
         page = self.paginate_queryset(enrollments)
         if page is not None:
-            serializer = EnrollmentSerializer(page, many=True)
+            serializer = EnrolledStudentSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = EnrollmentSerializer(enrollments, many=True)
+        serializer = EnrolledStudentSerializer(enrollments, many=True)
         return self.ok(serializer.data)

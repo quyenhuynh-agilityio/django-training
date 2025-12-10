@@ -29,6 +29,32 @@ class EnrollmentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'student', 'created_at', 'updated_at']
 
 
+class EnrolledStudentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for viewing enrolled students in a course (for instructors).
+    Shows student information without redundant course data.
+    """
+
+    student_name = serializers.CharField(source='student.full_name', read_only=True)
+    student_email = serializers.EmailField(source='student.email', read_only=True)
+    student_username = serializers.CharField(source='student.username', read_only=True)
+
+    class Meta:
+        model = Enrollment
+        fields = [
+            'id',
+            'student',
+            'student_name',
+            'student_email',
+            'student_username',
+            'status',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'student', 'created_at', 'updated_at']
+
+
 class EnrollmentCreateSerializer(serializers.Serializer):
     """
     Serializer for creating new enrollments (student enrollment).
