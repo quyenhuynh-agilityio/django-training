@@ -1,3 +1,10 @@
+"""
+Category ViewSets
+
+Router-friendly viewsets for categories, mirroring the accounts and courses
+layout (views + viewsets split).
+"""
+
 from drf_spectacular.utils import extend_schema
 
 from rest_framework import permissions, viewsets
@@ -13,9 +20,7 @@ class CategoryViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
     """
     Category ViewSet - List & Retrieve only
 
-    GET /api/v1/categories/ - List all categories
-
-    Permissions: AllowAny (public access)
+    GET /api/v1/categories/ - List all active categories
     """
 
     queryset = Category.objects.filter(is_active=True)
@@ -31,3 +36,14 @@ class CategoryViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        summary='Get category detail',
+        description='Retrieve a single active category by ID',
+        tags=['Categories'],
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+
+__all__ = ['CategoryViewSet']

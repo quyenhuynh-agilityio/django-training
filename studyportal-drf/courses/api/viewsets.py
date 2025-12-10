@@ -1,3 +1,11 @@
+"""
+Course ViewSets
+
+This module hosts router-friendly viewsets for course resources, mirroring the
+structure used in the accounts app (views + viewsets split). The main
+CourseViewSet keeps all Course CRUD plus the custom `enrolled_students` action.
+"""
+
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
@@ -13,27 +21,25 @@ from enrollments.models import Enrollment
 
 from .filters import CourseFilter
 from .permissions import IsInstructorOrReadOnly
-from .serializers import CourseCreateUpdateSerializer, CourseDetailSerializer, CourseListSerializer
+from .serializers import (
+    CourseCreateUpdateSerializer,
+    CourseDetailSerializer,
+    CourseListSerializer,
+)
 
 
 class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     """
-    Course ViewSet - Full CRUD operations
+    Course ViewSet - Full CRUD + enrolled students endpoint.
 
-    List: GET /api/v1/courses/ - Public (filtered for anonymous)
-    Retrieve: GET /api/v1/courses/{id}/ - Public
-    Create: POST /api/v1/courses/ - Instructors only
-    Update: PUT/PATCH /api/v1/courses/{id}/ - Course instructor only
-    Delete: DELETE /api/v1/courses/{id}/ - Course instructor only
-    Enrolled Students: GET /api/v1/courses/{id}/enrolled-students/ - Course instructor only
-
-    Filters:
-    - ?category={uuid} - Filter by category
-    - ?status=active - Filter by status
-    - ?search=python - Search in title/description
-    - ?my_courses=true - Show instructor's own courses
-
-    Pagination: 10 items per page
+    Routes (via DefaultRouter):
+    - GET    /api/v1/courses/                 -> list
+    - POST   /api/v1/courses/                 -> create (instructors)
+    - GET    /api/v1/courses/{id}/            -> retrieve
+    - PUT    /api/v1/courses/{id}/            -> update (instructor owner)
+    - PATCH  /api/v1/courses/{id}/            -> partial_update (instructor owner)
+    - DELETE /api/v1/courses/{id}/            -> destroy (instructor owner, with checks)
+    - GET    /api/v1/courses/{id}/enrolled-students/ -> enrolled_students (instructor owner)
     """
 
     permission_classes = [IsInstructorOrReadOnly]
@@ -43,34 +49,48 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     ordering_fields = ['title', 'created_at', 'enrolled_count']
     ordering = ['-created_at']
 
+    serializer_action_classes = {
+        'list': CourseListSerializer,
+        'retrieve': CourseDetailSerializer,
+        'create': CourseCreateUpdateSerializer,
+        'update': CourseCreateUpdateSerializer,
+        'partial_update': CourseCreateUpdateSerializer,
+        'enrolled_students': EnrolledStudentSerializer,
+    }
+
+    permission_action_classes = {
+        'enrolled_students': [permissions.IsAuthenticated, IsInstructorOrReadOnly],
+    }
+
+    def get_permissions(self):
+        """Return per-action permissions when provided."""
+        if self.action in self.permission_action_classes:
+            return [permission() for permission in self.permission_action_classes[self.action]]
+        return super().get_permissions()
+
     def get_queryset(self):
         """
-        Get queryset based on user role
+        Build queryset based on user role and query params.
 
-        Anonymous users: Only active courses with status='active'
-        Authenticated users: Active courses
-        Instructors: Can see their own courses (with ?my_courses=true)
+        Anonymous users: only active courses with status='active'
+        Authenticated users: active courses
+        Instructors: optionally filter own courses (?my_courses=true)
         """
         queryset = Course.objects.prefetch_related('categories').select_related('instructor')
 
-        # Add enrolled count annotation
         queryset = queryset.annotate(
             total_enrolled=Count('enrollments', filter=Q(enrollments__is_active=True))
         )
 
-        # Anonymous users see only active courses
         if not self.request.user.is_authenticated:
             queryset = queryset.filter(is_active=True, status='active')
         else:
-            # Authenticated users see active courses
             queryset = queryset.filter(is_active=True)
 
-        # Filter by category
         category_id = self.request.query_params.get('category')
         if category_id:
             queryset = queryset.filter(categories__id=category_id)
 
-        # Instructor can filter their own courses
         if self.request.user.is_authenticated and self.request.user.is_instructor():
             if self.request.query_params.get('my_courses') == 'true':
                 queryset = queryset.filter(instructor=self.request.user)
@@ -78,15 +98,11 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         return queryset.distinct()
 
     def get_serializer_class(self):
-        """Return appropriate serializer based on action"""
-        if self.action == 'list':
-            return CourseListSerializer
-        elif self.action == 'retrieve':
-            return CourseDetailSerializer
-        return CourseCreateUpdateSerializer
+        """Return appropriate serializer based on action."""
+        return self.serializer_action_classes.get(self.action, CourseCreateUpdateSerializer)
 
     def perform_create(self, serializer):
-        """Set instructor to current user"""
+        """Set instructor to current user on create."""
         serializer.save(instructor=self.request.user)
 
     @extend_schema(
@@ -130,8 +146,18 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     @extend_schema(
+        summary='Partial update course',
+        description='Partially update course details (course instructor only)',
+        tags=['Courses'],
+    )
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+
+    @extend_schema(
         summary='Delete course',
-        description='Soft delete course (course instructor only). Cannot delete if course is in progress with enrolled students.',
+        description=(
+            'Soft delete course (course instructor only). Cannot delete if course is in progress with enrolled students.'
+        ),
         tags=['Courses'],
     )
     def destroy(self, request, *args, **kwargs):
@@ -141,14 +167,12 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         """
         course = self.get_object()
 
-        # Check if course is in progress and has enrolled students
         if course.status == Course.STATUS_IN_PROGRESS and course.enrolled_count > 0:
             return self.bad_request(
                 message='Cannot delete a course that is in progress with enrolled students.',
                 code='COURSE_IN_PROGRESS_WITH_STUDENTS',
             )
 
-        # Perform soft delete
         course.soft_delete()
         return self.ok({'message': 'Course deleted successfully.'})
 
@@ -169,12 +193,10 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         Get enrolled students for a course
         GET /api/v1/courses/{id}/enrolled-students/
 
-        Only accessible by course instructor
-        Returns paginated list of enrolled students with their details.
+        Only accessible by course instructor. Returns paginated list of enrolled students.
         """
         course = self.get_object()
 
-        # Check if user is course instructor
         if course.instructor != request.user:
             return self.forbidden({'error': 'Only course instructor can view enrolled students.'})
 
@@ -184,7 +206,6 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
             .order_by('-created_at')
         )
 
-        # Pagination
         page = self.paginate_queryset(enrollments)
         if page is not None:
             serializer = EnrolledStudentSerializer(page, many=True)
@@ -192,3 +213,6 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         serializer = EnrolledStudentSerializer(enrollments, many=True)
         return self.ok(serializer.data)
+
+
+__all__ = ['CourseViewSet']

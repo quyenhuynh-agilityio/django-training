@@ -13,6 +13,7 @@ All views inherit from CommonViewSet for consistent response formatting.
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -1040,3 +1041,16 @@ class UserProfileView(CommonViewSet, generics.RetrieveUpdateAPIView):
             Response with updated user profile
         """
         return super().patch(request, *args, **kwargs)
+
+
+# ============================================
+# TOKEN REFRESH
+# ============================================
+
+
+class TokenRefreshSchemaView(TokenRefreshView):
+    """JWT access token refresh endpoint with schema tags."""
+
+    @extend_schema(tags=['Authentication'], summary='Refresh access token')
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)

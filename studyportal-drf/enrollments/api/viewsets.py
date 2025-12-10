@@ -1,7 +1,15 @@
+"""
+Enrollment ViewSets
+
+Router-friendly viewsets and actions for enrollment flows, aligned with the
+accounts/courses structure (views + viewsets split).
+"""
+
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from rest_framework import generics, serializers, viewsets
+from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.views import APIView
 
@@ -69,19 +77,6 @@ class EnrollInCourseView(CommonViewSet, generics.CreateAPIView):
     Enroll in Course API
 
     POST /api/v1/students/enroll/
-
-    Request body:
-    {
-        "course_id": "uuid"
-    }
-
-    Validations:
-    - Course must exist
-    - Course must be active (status='active')
-    - Course must not be full
-    - Student cannot enroll twice
-
-    Permissions: Students only
     """
 
     serializer_class = EnrollmentCreateSerializer
@@ -115,7 +110,6 @@ class EnrollInCourseView(CommonViewSet, generics.CreateAPIView):
             serializer.is_valid(raise_exception=True)
             enrollment = serializer.save()
 
-            # Return full enrollment details
             output_serializer = EnrollmentSerializer(enrollment)
             return self.created(
                 {
@@ -133,11 +127,6 @@ class LeaveCourseView(CommonViewSet, APIView):
     Leave Course API
 
     DELETE /api/v1/students/leave/{course_id}/
-
-    Unenrolls student from the specified course.
-    Sets is_active=False and status='dropped'
-
-    Permissions: Students only
     """
 
     permission_classes = [IsStudent]
@@ -158,10 +147,38 @@ class LeaveCourseView(CommonViewSet, APIView):
                 student=request.user, course__id=course_id, is_active=True
             )
 
-            # Unenroll
             enrollment.unenroll()
 
             return self.ok({'message': 'Successfully left the course'})
 
         except Enrollment.DoesNotExist:
             return self.not_found()
+
+
+class EnrollmentActionsViewSet(viewsets.GenericViewSet):
+    """
+    Router-friendly wrapper to expose enroll/leave actions alongside the
+    enrollment viewset, matching the accounts app pattern.
+    """
+
+    serializer_class = EnrollmentCreateSerializer
+    permission_classes = [IsStudent]
+
+    @extend_schema(tags=['Enrollments'], summary='Enroll in course (router action)')
+    @action(detail=False, methods=['post'])
+    def enroll(self, request):
+        return EnrollInCourseView.as_view()(request._request)
+
+    @extend_schema(tags=['Enrollments'], summary='Leave course (router action)')
+    @action(detail=False, methods=['delete'], url_path='leave/(?P<course_id>[^/.]+)')
+    def leave(self, request, course_id=None):
+        # Pass through the underlying view for consistency
+        return LeaveCourseView.as_view()(request._request, course_id=course_id)
+
+
+__all__ = [
+    'StudentEnrolledCoursesViewSet',
+    'EnrollInCourseView',
+    'LeaveCourseView',
+    'EnrollmentActionsViewSet',
+]

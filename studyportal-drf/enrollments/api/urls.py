@@ -1,8 +1,9 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from enrollments.api.views import (
+from enrollments.api.viewsets import (
     EnrollInCourseView,
+    EnrollmentActionsViewSet,
     LeaveCourseView,
     StudentEnrolledCoursesViewSet,
 )
@@ -11,6 +12,9 @@ from enrollments.api.views import (
 router = DefaultRouter()
 router.register(
     r'students/enrolled-courses', StudentEnrolledCoursesViewSet, basename='enrolled-course'
+)
+router.register(
+    r'students/enrollment-actions', EnrollmentActionsViewSet, basename='enrollment-action'
 )
 
 # URL patterns
