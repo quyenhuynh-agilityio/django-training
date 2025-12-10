@@ -1,3 +1,21 @@
+"""
+Refactored User/Auth Serializers with Reusable Mixins
+
+This module includes:
+- Registration
+- Login
+- Password Reset (request + confirm)
+- Change Password
+- User Profile retrieval
+
+Design Philosophy:
+------------------
+DRY principle — shared logic moved to mixins
+- Clear and maintainable structure
+- Security-aware validation (e.g., no user enumeration)
+- Serializer responsibilities separated cleanly
+"""
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
@@ -8,29 +26,107 @@ from rest_framework import serializers
 User = get_user_model()
 
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Student Registration Serializer
+# ======================================================================
+# Mixins (Reusable Validation Helpers)
+# ======================================================================
 
-    Validation:
-    - Email must be unique and valid format
-    - Password must meet Django's password validation
-    - Password confirmation must match
-    - All required fields must be present
+
+class StripAndLowerEmailMixin:
+    """
+    Normalize email input:
+    - Removes leading/trailing whitespace
+    - Converts to lowercase
+
+    Used in: Registration, Login, Password Reset (request)
+    """
+
+    def normalize_email(self, value: str) -> str:
+        return value.strip().lower()
+
+
+class StripNameMixin:
+    """
+    Normalize first/last names + ensure non-empty.
+
+    Reusable for any serializer dealing with names.
+    """
+
+    def clean_name(self, value: str, field_name: str):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError(f'{field_name} cannot be empty.')
+        return value
+
+
+class PasswordConfirmationMixin:
+    """
+    Shared logic for verifying password_confirmation fields.
+
+    Reduces duplication across:
+    - Registration
+    - Password Reset Confirm
+    - Change Password
+    """
+
+    def validate_password_confirmation(self, password, password_confirm):
+        if password != password_confirm:
+            raise serializers.ValidationError("Password fields didn't match.")
+
+
+class UIDAndTokenValidatorMixin:
+    """
+    Validates password reset UID + token pair.
+
+    Used exclusively in password reset confirmation phase.
+    Ensures:
+    - UID decodes properly
+    - User exists for given UID
+    - Token is valid and not expired
+    """
+
+    def validate_uid_and_token(self, uid, token):
+        try:
+            uid_decoded = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=uid_decoded)
+        except Exception:
+            # Prevent leakage of specific error detail
+            raise serializers.ValidationError('Invalid reset link.')  # noqa: B904
+
+        # Validate token authenticity and expiration
+        if not default_token_generator.check_token(user, token):
+            raise serializers.ValidationError('Invalid or expired reset token.')
+
+        return user
+
+
+# ======================================================================
+# Registration Serializer
+# ======================================================================
+
+
+class UserRegistrationSerializer(
+    StripAndLowerEmailMixin, StripNameMixin, PasswordConfirmationMixin, serializers.ModelSerializer
+):
+    """
+    Handles new student registration.
+
+    Features:
+    ---------
+    - Email normalization + uniqueness validation
+    - Username sanitized and validated
+    - Password confirmation
+    - Strong password validation (via Django)
+    - Creates account with role="student"
     """
 
     password = serializers.CharField(
         write_only=True,
-        required=True,
-        validators=[validate_password],
+        validators=[validate_password],  # apply Django's password policy
         style={'input_type': 'password'},
-        help_text='Password must be at least 8 characters',
     )
     password_confirm = serializers.CharField(
         write_only=True,
-        required=True,
         style={'input_type': 'password'},
-        help_text='Re-enter password for confirmation',
     )
 
     class Meta:
@@ -46,248 +142,219 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id']
         extra_kwargs = {
-            'email': {'required': True, 'help_text': 'Valid email address'},
-            'username': {'required': True, 'help_text': 'Unique username (alphanumeric)'},
-            'first_name': {'required': True, 'help_text': 'First name'},
-            'last_name': {'required': True, 'help_text': 'Last name'},
+            'email': {'required': True},
+            'username': {'required': True},
+            'first_name': {'required': True},
+            'last_name': {'required': True},
         }
+
+    # ---- Field-level validations ---------------------------------------------------------
 
     def validate_email(self, value):
         """
-        Field-level validation for email
-        - Convert to lowercase
-        - Check uniqueness
+        Normalize and ensure email is unique.
         """
-        value = value.lower().strip()
-
+        value = self.normalize_email(value)
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('A user with this email address already exists.')
-
+            raise serializers.ValidationError('Email already exists.')
         return value
 
     def validate_username(self, value):
         """
-        Field-level validation for username
-        - Must be alphanumeric
-        - Check uniqueness
+        Validate username:
+        - Must contain only alphanumeric characters or underscores
+        - Must be unique
         """
         value = value.strip()
-
         if not value.replace('_', '').isalnum():
             raise serializers.ValidationError(
-                'Username must contain only letters, numbers, and underscores.'
+                'Username may contain letters, numbers, and underscores only.'
             )
-
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError('A user with this username already exists.')
-
+            raise serializers.ValidationError('Username already exists.')
         return value
 
     def validate_first_name(self, value):
-        """Validate first name is not empty"""
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError('First name cannot be empty.')
-        return value
+        return self.clean_name(value, 'First name')
 
     def validate_last_name(self, value):
-        """Validate last name is not empty"""
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError('Last name cannot be empty.')
-        return value
+        return self.clean_name(value, 'Last name')
+
+    # ---- Object-level validation ----------------------------------------------------------
 
     def validate(self, attrs):
         """
-        Object-level validation
-        - Check password confirmation matches
+        Validate password confirmation.
         """
-        if attrs['password'] != attrs['password_confirm']:
-            raise serializers.ValidationError({'password': "Password fields didn't match."})
-
+        self.validate_password_confirmation(attrs['password'], attrs['password_confirm'])
         return attrs
+
+    # ---- Create User ---------------------------------------------------------------------
 
     def create(self, validated_data):
         """
-        Create user with hashed password
-        - Remove password_confirm
-        - Set role to 'student'
-        - Use create_user for proper password hashing
+        Create user account using Django's create_user() method,
+        which automatically handles password hashing.
+
+        Role is force-set to "student" for this serializer.
         """
         validated_data.pop('password_confirm')
-
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            username=validated_data['username'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            password=validated_data['password'],
-            role='student',  # Force student role for registration
-        )
-
-        return user
+        return User.objects.create_user(role='student', **validated_data)
 
 
-class UserLoginSerializer(serializers.Serializer):
+# ======================================================================
+# Login Serializer
+# ======================================================================
+
+
+class UserLoginSerializer(StripAndLowerEmailMixin, serializers.Serializer):
     """
-    Login Serializer
+    Authenticates user based on email + password.
 
-    Validation:
-    - Email and password required
-    - Credentials must be valid
-    - User must be active
+    Important Security Note:
+    ------------------------
+    Never disclose which field (email or password) is incorrect.
+    This prevents attackers from enumerating registered emails.
     """
 
-    email = serializers.EmailField(required=True, help_text='Email address')
-    password = serializers.CharField(
-        write_only=True, required=True, style={'input_type': 'password'}, help_text='Password'
-    )
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
     def validate_email(self, value):
-        """Normalize email to lowercase"""
-        return value.lower().strip()
+        return self.normalize_email(value)
 
     def validate(self, attrs):
         """
-        Object-level validation
-        - Check credentials
-        - Check user is active
+        Validate:
+        - user exists
+        - password matches
+        - account is active
         """
-        email = attrs.get('email')
-        password = attrs.get('password')
+        email = attrs['email']
+        password = attrs['password']
 
-        # Check if user exists
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError({'detail': 'Invalid email or password.'})  # noqa: B904
+        # Get user if exists, but quietly return generic message on failure
+        user = User.objects.filter(email=email).first()
 
-        # Check if user is active
+        if not user or not user.check_password(password):
+            raise serializers.ValidationError({'detail': 'Invalid email or password.'})
+
         if not user.is_active:
             raise serializers.ValidationError({'detail': 'User account is disabled.'})
 
-        # Check password
-        if not user.check_password(password):
-            raise serializers.ValidationError({'detail': 'Invalid email or password.'})
-
         attrs['user'] = user
         return attrs
 
 
-class PasswordResetRequestSerializer(serializers.Serializer):
-    """
-    Password Reset Request Serializer
+# ======================================================================
+# Password Reset (Request)
+# ======================================================================
 
-    Validation:
-    - Email must be valid format
-    - Don't reveal if email exists (security)
+
+class PasswordResetRequestSerializer(StripAndLowerEmailMixin, serializers.Serializer):
+    """
+    Accepts an email for initiating password reset.
+
+    Security Best Practice:
+    -----------------------
+    Do NOT check whether the email exists.
+       API should always return success to prevent revealing registered emails.
     """
 
-    email = serializers.EmailField(required=True, help_text='Email address associated with account')
+    email = serializers.EmailField()
 
     def validate_email(self, value):
-        """Normalize email"""
-        return value.lower().strip()
+        return self.normalize_email(value)
 
 
-class PasswordResetConfirmSerializer(serializers.Serializer):
+# ======================================================================
+# Password Reset (Confirm)
+# ======================================================================
+
+
+class PasswordResetConfirmSerializer(
+    PasswordConfirmationMixin, UIDAndTokenValidatorMixin, serializers.Serializer
+):
     """
-    Password Reset Confirmation Serializer
+    Validates reset token and allows setting a new password.
 
-    Validation:
-    - UID and token must be valid
-    - New password must meet requirements
-    - Password confirmation must match
+    Steps:
+    ------
+    1. Ensure new passwords match
+    2. Decode UID and validate user
+    3. Validate reset token
+    4. Return user for view to update password
     """
 
-    uid = serializers.CharField(required=True, help_text='User ID (base64 encoded)')
-    token = serializers.CharField(required=True, help_text='Password reset token')
+    uid = serializers.CharField()
+    token = serializers.CharField()
     new_password = serializers.CharField(
         write_only=True,
-        required=True,
         validators=[validate_password],
         style={'input_type': 'password'},
-        help_text='New password',
     )
     new_password_confirm = serializers.CharField(
         write_only=True,
-        required=True,
         style={'input_type': 'password'},
-        help_text='Confirm new password',
     )
 
     def validate(self, attrs):
-        """
-        Object-level validation
-        - Check passwords match
-        - Validate token
-        """
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({'new_password': "Password fields didn't match."})
+        # Step 1: confirm new passwords match
+        self.validate_password_confirmation(attrs['new_password'], attrs['new_password_confirm'])
 
-        # Validate UID and token
-        try:
-            uid = force_str(urlsafe_base64_decode(attrs['uid']))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            raise serializers.ValidationError({'detail': 'Invalid reset link.'})  # noqa: B904
-
-        if not default_token_generator.check_token(user, attrs['token']):
-            raise serializers.ValidationError({'detail': 'Invalid or expired reset token.'})
+        # Step 2–3: validate UID + token
+        user = self.validate_uid_and_token(attrs['uid'], attrs['token'])
 
         attrs['user'] = user
         return attrs
 
 
-class ChangePasswordSerializer(serializers.Serializer):
-    """
-    Change Password Serializer (for authenticated users)
+# ======================================================================
+# Change Password (Authenticated)
+# ======================================================================
 
-    Validation:
-    - Old password must be correct
-    - New password must meet requirements
-    - New password must be different from old
+
+class ChangePasswordSerializer(PasswordConfirmationMixin, serializers.Serializer):
+    """
+    Allows already authenticated users to change their password.
+
+    Validations:
+    ------------
+    - Old password required
+    - New password must match confirmation
+    - New password must NOT equal old password
     """
 
-    old_password = serializers.CharField(
-        write_only=True,
-        required=True,
-        style={'input_type': 'password'},
-        help_text='Current password',
-    )
+    old_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     new_password = serializers.CharField(
-        write_only=True,
-        required=True,
-        validators=[validate_password],
-        style={'input_type': 'password'},
-        help_text='New password',
+        write_only=True, validators=[validate_password], style={'input_type': 'password'}
     )
-    new_password_confirm = serializers.CharField(
-        write_only=True,
-        required=True,
-        style={'input_type': 'password'},
-        help_text='Confirm new password',
-    )
+    new_password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
     def validate(self, attrs):
-        """
-        Object-level validation
-        - Check passwords match
-        - Check new password different from old
-        """
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({'new_password': "Password fields didn't match."})
+        # Confirm new passwords match
+        self.validate_password_confirmation(attrs['new_password'], attrs['new_password_confirm'])
 
+        # Ensure new password differs from old password
         if attrs['old_password'] == attrs['new_password']:
             raise serializers.ValidationError(
-                {'new_password': 'New password must be different from old password.'}
+                {'new_password': 'New password must be different from the old password.'}
             )
 
         return attrs
 
 
+# ======================================================================
+# User Profile Serializer
+# ======================================================================
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
-    """User Profile Serializer"""
+    """
+    Returns full user profile details.
+
+    All fields are read-only to avoid unintended data exposure.
+    """
 
     full_name = serializers.CharField(read_only=True)
 

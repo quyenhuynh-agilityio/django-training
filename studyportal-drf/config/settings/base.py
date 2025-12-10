@@ -217,3 +217,14 @@ EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+
+# ==============================
+# PASSWORD RESET DEBUG OPTIONS
+# ==============================
+# Allow testing the reset flow directly in Swagger without sending emails.
+# When enabled, the reset request endpoint will return uid/token/reset_link.
+PASSWORD_RESET_DEBUG_EXPOSE_TOKENS = env.bool('PASSWORD_RESET_DEBUG_EXPOSE_TOKENS', default=DEBUG)
+# Skip sending emails entirely (useful for local Swagger testing)
+PASSWORD_RESET_DISABLE_EMAIL = env.bool('PASSWORD_RESET_DISABLE_EMAIL', default=False)
+# Frontend URL used to build reset link (falls back to localhost)
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')

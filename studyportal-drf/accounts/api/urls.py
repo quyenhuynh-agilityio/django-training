@@ -1,30 +1,18 @@
+# accounts/api/urls.py
+
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 
-from accounts.api.views import (
-    ChangePasswordView,
-    PasswordResetConfirmView,
-    PasswordResetRequestView,
-    UserLoginView,
-    UserLogoutView,
-    UserProfileView,
-    UserRegistrationView,
-)
+from .viewsets import AuthViewSet
 
-# API v1 URLs
+router = DefaultRouter()
+router.register(r'auth', AuthViewSet, basename='auth')
+
 urlpatterns = [
-    # Authentication Endpoints
-    path('register/', UserRegistrationView.as_view(), name='register'),
-    path('login/', UserLoginView.as_view(), name='login'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('password/reset/', PasswordResetRequestView.as_view(), name='password_reset'),
-    path(
-        'password/reset/confirm/',
-        PasswordResetConfirmView.as_view(),
-        name='password_reset_confirm',
-    ),
-    path('password/change/', ChangePasswordView.as_view(), name='change_password'),
-    path('logout/', UserLogoutView.as_view(), name='logout'),
-    path('me/', UserProfileView.as_view(), name='me'),
+    # JWT token refresh
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
+
+urlpatterns += router.urls
