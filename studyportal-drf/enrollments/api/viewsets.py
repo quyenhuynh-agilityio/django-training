@@ -6,6 +6,7 @@ accounts/courses structure (views + viewsets split).
 """
 
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from rest_framework import generics, serializers, viewsets
@@ -45,6 +46,10 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
 
     def get_queryset(self):
         """Get enrollments for current student only"""
+        # Handle schema generation (drf-spectacular introspection)
+        if getattr(self, 'swagger_fake_view', False):
+            return Enrollment.objects.none()
+
         return (
             Enrollment.objects.filter(student=self.request.user, is_active=True)
             .select_related('course', 'course__instructor')
@@ -66,6 +71,14 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
     @extend_schema(
         summary='Get enrollment detail',
         description='Get detailed information about an enrollment',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                description='Enrollment UUID',
+            ),
+        ],
         tags=['Enrollments'],
     )
     def retrieve(self, request, *args, **kwargs):
@@ -169,7 +182,18 @@ class EnrollmentActionsViewSet(viewsets.GenericViewSet):
     def enroll(self, request):
         return EnrollInCourseView.as_view()(request._request)
 
-    @extend_schema(tags=['Enrollments'], summary='Leave course (router action)')
+    @extend_schema(
+        tags=['Enrollments'],
+        summary='Leave course (router action)',
+        parameters=[
+            OpenApiParameter(
+                name='course_id',
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                description='Course UUID',
+            ),
+        ],
+    )
     @action(detail=False, methods=['delete'], url_path='leave/(?P<course_id>[^/.]+)')
     def leave(self, request, course_id=None):
         # Pass through the underlying view for consistency

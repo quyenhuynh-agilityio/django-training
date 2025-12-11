@@ -30,6 +30,7 @@ class Course(models.Model):
     course_code = models.CharField(
         max_length=20,
         db_index=True,
+        unique=True,
         help_text='Human-readable unique code: PY101, WEB202, etc.',
     )
     description = models.TextField(
@@ -102,14 +103,15 @@ class Course(models.Model):
 
     # ─── Helper Properties (Used in API, Templates, Mobile) ─────
     @property
-    def enrolled_count(self):
-        """Current number of active students — used for capacity check"""
+    def _enrolled_count(self):
+        """Current number of active students — used for capacity check (fallback when annotation not available)"""
         return self.enrollments.filter(is_active=True).count()
 
-    @property
     def is_full(self):
         """True if enrollment cap is reached"""
-        return self.max_students is not None and self.enrolled_count >= self.max_students
+        # Use annotated value if available, otherwise compute it
+        enrolled = getattr(self, 'enrolled_count', self._enrolled_count)
+        return self.max_students is not None and enrolled >= self.max_students
 
     def can_enroll(self):
         """
@@ -134,7 +136,7 @@ class Course(models.Model):
                 old = None
 
             if old and old.is_active and not self.is_active:
-                if old.status == self.STATUS_IN_PROGRESS and self.enrolled_count > 0:
+                if old.status == self.STATUS_IN_PROGRESS and self._enrolled_count > 0:
                     raise ValidationError(
                         'Cannot disable a course that is in progress with enrolled students.'
                     )
@@ -148,7 +150,6 @@ class Course(models.Model):
         self.is_active = False
         self.save(update_fields=['is_active', 'updated_at'])
 
-    @property
     def is_deleted(self):
         """Check if course is soft-deleted"""
         return not self.is_active

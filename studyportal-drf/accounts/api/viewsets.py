@@ -76,7 +76,7 @@ class AuthViewSet(viewsets.GenericViewSet):
     def password_change(self, request):
         return ChangePasswordView.as_view()(request._request)
 
-    @extend_schema(tags=['Authentication'], summary='Get/update current user profile')
+    @extend_schema(tags=['Profile'], summary='Get/update current user profile')
     @action(
         detail=False,
         methods=['get', 'put', 'patch'],

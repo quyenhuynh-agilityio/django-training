@@ -205,6 +205,10 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API for managing student course enrollments',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'ENUM_NAME_OVERRIDES': {
+        'CourseStatusEnum': 'courses.models.Course.STATUS_CHOICES',
+        'EnrollmentStatusEnum': 'enrollments.models.Enrollment.STATUS_CHOICES',
+    },
 }
 
 # ==============================

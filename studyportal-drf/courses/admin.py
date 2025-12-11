@@ -104,7 +104,15 @@ class CourseAdmin(admin.ModelAdmin):
     # -------------------------------------------------------------------
 
     def get_queryset(self, request):
-        """Optimize queries and add enrollment count annotation."""
+        """
+        Optimize queries and add enrollment count annotation.
+
+        Args:
+            request: HTTP request object
+
+        Returns:
+            QuerySet: Optimized queryset with annotations
+        """
         return (
             super()
             .get_queryset(request)
@@ -118,7 +126,15 @@ class CourseAdmin(admin.ModelAdmin):
     # -------------------------------------------------------------------
 
     def instructor_link(self, obj):
-        """Clickable instructor link."""
+        """
+        Display clickable instructor link.
+
+        Args:
+            obj: Course instance
+
+        Returns:
+            str: HTML formatted instructor link
+        """
         if not obj.instructor:
             return format_html('<span style="color:#dc3545;">No Instructor</span>')
 
@@ -126,15 +142,23 @@ class CourseAdmin(admin.ModelAdmin):
         return format_html('<a href="{}">{}</a>', url, obj.instructor.full_name)
 
     instructor_link.short_description = 'Instructor'
+    instructor_link.admin_order_field = 'instructor__first_name'
 
     def status_badge(self, obj):
-        """Colored status badge."""
+        """
+        Display colored status badge.
+
+        Args:
+            obj: Course instance
+
+        Returns:
+            str: HTML formatted status badge
+        """
         colors = {
-            'draft': '#6c757d',
-            'active': '#28a745',
-            'in_progress': '#007bff',
-            'completed': '#17a2b8',
-            'inactive': '#dc3545',
+            Course.STATUS_DRAFT: '#6c757d',
+            Course.STATUS_ACTIVE: '#28a745',
+            Course.STATUS_IN_PROGRESS: '#007bff',
+            Course.STATUS_COMPLETED: '#17a2b8',
         }
 
         color = colors.get(obj.status, '#6c757d')
@@ -146,10 +170,20 @@ class CourseAdmin(admin.ModelAdmin):
         )
 
     status_badge.short_description = 'Status'
+    status_badge.admin_order_field = 'status'
 
     def enrollment_info(self, obj):
-        """Colored enrollment stats."""
-        count = obj.enrolled_count
+        """
+        Display colored enrollment statistics.
+
+        Args:
+            obj: Course instance
+
+        Returns:
+            str: HTML formatted enrollment info
+        """
+        # Use annotated value if available (from get_queryset), otherwise compute it
+        count = getattr(obj, 'enrollment_count', obj._enrolled_count)
         max_students = obj.max_students or '∞'
 
         if obj.is_full:
@@ -169,23 +203,34 @@ class CourseAdmin(admin.ModelAdmin):
     enrollment_info.short_description = 'Enrollments'
 
     def categories_list(self, obj):
-        """Display categories as badges."""
+        """
+        Display categories as badges.
+
+        Args:
+            obj: Course instance
+
+        Returns:
+            str: HTML formatted category badges
+        """
         categories = obj.categories.all()[:3]
 
         if not categories:
             return '-'
 
         badges = [
-            f'<span style="background:#17a2b8; color:white; padding:2px 6px; '
-            f'border-radius:3px; margin-right:3px; font-size:11px;">{c.name}</span>'
+            format_html(
+                '<span style="background:#17a2b8; color:white; padding:2px 6px; '
+                'border-radius:3px; margin-right:3px; font-size:11px;">{}</span>',
+                c.name,
+            )
             for c in categories
         ]
 
         extra = obj.categories.count() - 3
         if extra > 0:
-            badges.append(f'<span>+{extra} more</span>')
+            badges.append(format_html('<span>+{} more</span>', extra))
 
-        return format_html(''.join(badges))
+        return format_html(''.join(str(badge) for badge in badges))
 
     categories_list.short_description = 'Categories'
 
@@ -201,14 +246,31 @@ class CourseAdmin(admin.ModelAdmin):
     ]
 
     def activate_courses(self, request, queryset):
+        """
+        Bulk action to activate selected courses.
+
+        Args:
+            request: HTTP request object
+            queryset: Selected course queryset
+        """
         updated = queryset.update(is_active=True)
         self.message_user(request, f'{updated} course(s) activated.', level='success')
 
     activate_courses.short_description = 'Activate courses'
 
     def deactivate_courses(self, request, queryset):
-        """Prevent deactivating courses in progress with active students."""
-        in_progress = queryset.filter(status='in_progress', enrollments__is_active=True).distinct()
+        """
+        Bulk action to deactivate selected courses.
+
+        Prevents deactivating courses in progress with active students.
+
+        Args:
+            request: HTTP request object
+            queryset: Selected course queryset
+        """
+        in_progress = queryset.filter(
+            status=Course.STATUS_IN_PROGRESS, enrollments__is_active=True
+        ).distinct()
 
         if in_progress.exists():
             self.message_user(
@@ -226,7 +288,14 @@ class CourseAdmin(admin.ModelAdmin):
     deactivate_courses.short_description = 'Deactivate courses'
 
     def set_to_active_status(self, request, queryset):
-        updated = queryset.update(status='active')
+        """
+        Bulk action to set selected courses to active status.
+
+        Args:
+            request: HTTP request object
+            queryset: Selected course queryset
+        """
+        updated = queryset.update(status=Course.STATUS_ACTIVE)
         self.message_user(request, f'{updated} course(s) set to Active.', level='success')
 
     set_to_active_status.short_description = 'Set status to Active'
@@ -236,8 +305,17 @@ class CourseAdmin(admin.ModelAdmin):
     # -------------------------------------------------------------------
 
     def set_instructor(self, request, queryset):
-        """Assign instructor to selected courses."""
-        instructors = User.objects.filter(role='instructor').order_by(
+        """
+        Bulk action to assign instructor to selected courses.
+
+        Args:
+            request: HTTP request object
+            queryset: Selected course queryset
+
+        Returns:
+            TemplateResponse | None: Template response for form or None on success
+        """
+        instructors = User.objects.filter(role=User.ROLE_INSTRUCTOR).order_by(
             'first_name', 'last_name', 'email'
         )
 
@@ -248,7 +326,7 @@ class CourseAdmin(admin.ModelAdmin):
                 self.message_user(request, 'No instructor selected.', level='error')
                 return None
 
-            instructor = User.objects.filter(id=instructor_id, role='instructor').first()
+            instructor = User.objects.filter(id=instructor_id, role=User.ROLE_INSTRUCTOR).first()
 
             if not instructor:
                 self.message_user(request, 'Invalid instructor.', level='error')

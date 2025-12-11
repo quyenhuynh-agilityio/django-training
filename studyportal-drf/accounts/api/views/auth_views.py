@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 
 from core.api_views import CommonViewSet
 
-from .serializers import (
+from ..serializers import (
     ChangePasswordSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
