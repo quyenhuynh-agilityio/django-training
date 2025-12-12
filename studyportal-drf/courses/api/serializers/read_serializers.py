@@ -28,10 +28,7 @@ class InstructorSerializer(serializers.ModelSerializer):
     Read-only serializer for instructor information.
 
     Used to display instructor details in course responses.
-    All fields are read-only to prevent accidental user modification.
-
-    Note:
-        Requires select_related('instructor') in viewset for optimal performance.
+    Requires select_related('instructor') in viewset for optimal performance.
     """
 
     class Meta:
@@ -50,63 +47,34 @@ class CourseListSerializer(
     Lightweight serializer for course list views.
 
     Optimized for performance with computed enrollment fields from mixins.
-    Includes nested categories for filtering in mobile app and course list.
+    Includes nested categories for filtering.
 
-    Performance Requirements:
-        Requires queryset optimization in viewset:
+    Queryset Requirements:
         - select_related('instructor')
         - prefetch_related('categories')
-        - annotate(enrolled_count_computed=..., is_full_computed=..., can_enroll_computed=...)
-
-    Use Case: GET /api/v1/courses/
-
-    Response Structure:
-        {
-            "id": "uuid",
-            "title": "Introduction to Python",
-            "course_code": "PY101",
-            "instructor_name": "John Doe",
-            "categories": [{"id": "uuid", "name": "Programming"}, ...],
-            "enrolled_count": 25,
-            "is_full": false,
-            "can_enroll": true,
-            "max_students": 30,
-            ...
-        }
+        - annotate(enrolled_count_computed, is_full_computed, can_enroll_computed)
     """
 
-    categories = CategorySerializer(
-        many=True, read_only=True, help_text='List of categories this course belongs to'
-    )
-    instructor_name = serializers.CharField(
-        source='instructor.full_name',
-        read_only=True,
-        help_text='Full name of the course instructor',
-    )
+    categories = CategorySerializer(many=True, read_only=True)
+    instructor_name = serializers.CharField(source='instructor.full_name', read_only=True)
 
     class Meta:
         model = Course
         fields = [
-            # Basic info
             'id',
             'title',
             'course_code',
             'description',
-            # Relationships
             'categories',
             'instructor_name',
-            # Media
             'image_url',
             'video_url',
-            # Status
             'status',
             'is_active',
-            # Enrollment info (from CourseEnrollmentComputedMixin)
             'enrolled_count',
             'is_full',
             'can_enroll',
             'max_students',
-            # Timestamps (from AuditReadOnlyFieldsMixin)
             'created_at',
         ]
         read_only_fields = AuditReadOnlyFieldsMixin.audit_fields(include_updated=False)
@@ -125,60 +93,33 @@ class CourseDetailSerializer(
     Includes all course information with nested related objects.
     Uses multiple mixins for enrollment stats, categories, and category names.
 
-    Performance Requirements:
-        Requires queryset optimization in viewset:
+    Queryset Requirements:
         - select_related('instructor')
         - prefetch_related('categories')
-        - annotate(enrolled_count_computed=..., is_full_computed=..., can_enroll_computed=...)
-
-    Use Case: GET /api/v1/courses/{id}/
-
-    Response Structure:
-        {
-            "id": "uuid",
-            "title": "Introduction to Python",
-            "course_code": "PY101",
-            "categories": [{"id": "uuid", "name": "Programming"}, ...],
-            "category_names": "Programming, Python",
-            "instructor": {"id": "uuid", "email": "...", "full_name": "John Doe"},
-            "video_url": "https://youtube.com/...",
-            "image_url": "https://cloudinary.com/...",
-            "enrolled_count": 25,
-            "is_full": false,
-            "can_enroll": true,
-            ...
-        }
+        - annotate(enrolled_count_computed, is_full_computed, can_enroll_computed)
     """
 
-    categories = CategorySerializer(
-        many=True, read_only=True, help_text='List of categories this course belongs to'
-    )
-    instructor = InstructorSerializer(read_only=True, help_text='Complete instructor information')
+    categories = CategorySerializer(many=True, read_only=True)
+    instructor = InstructorSerializer(read_only=True)
 
     class Meta:
         model = Course
         fields = [
-            # Basic info
             'id',
             'title',
             'course_code',
             'description',
-            # Relationships
             'categories',
             'category_names',
             'instructor',
-            # Media (used in mobile app & web)
             'video_url',
             'image_url',
-            # Status
             'status',
             'is_active',
             'max_students',
-            # Enrollment info (from CourseEnrollmentComputedMixin)
             'enrolled_count',
             'is_full',
             'can_enroll',
-            # Timestamps (from AuditReadOnlyFieldsMixin)
             'created_at',
             'updated_at',
         ]
