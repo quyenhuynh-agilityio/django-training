@@ -10,10 +10,9 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, viewsets
 from rest_framework.filters import OrderingFilter, SearchFilter
 
+from categories.api.serializes.category import CategorySerializer
 from categories.models import Category
 from core.api_views import CommonViewSet
-
-from .serializers import CategorySerializer
 
 
 class CategoryViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):

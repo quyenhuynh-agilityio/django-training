@@ -15,7 +15,7 @@ class IsInstructorOrReadOnly(permissions.BasePermission):
             return True
 
         # Write permissions only for authenticated instructors
-        return request.user.is_authenticated and request.user.is_instructor()
+        return request.user.is_authenticated and request.user.is_instructor
 
     def has_object_permission(self, request, view, obj):
         # Read permissions for everyone
@@ -30,4 +30,4 @@ class IsStudent(permissions.BasePermission):
     """Only students can access"""
 
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.is_student()
+        return request.user.is_authenticated and request.user.is_student

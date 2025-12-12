@@ -10,7 +10,7 @@ Serializers for read-only operations (list and detail views):
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from categories.api.serializers import CategorySerializer
+from categories.api.serializes.category import CategorySerializer
 from courses.models import Course
 from utils.serializers import AuditReadOnlyFieldsMixin
 

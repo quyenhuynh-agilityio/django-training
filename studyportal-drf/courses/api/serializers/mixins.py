@@ -64,15 +64,15 @@ class CourseEnrollmentComputedMixin(serializers.Serializer):
 
     def get_is_full(self, obj):
         """
-        Get is_full from annotation or model method.
+        Get is_full from annotation or model property.
 
-        The model's is_full() is a method, not a property.
+        The model's is_full is a property, not a method.
         """
         # Check for annotation first
         if hasattr(obj, 'is_full_computed'):
             return obj.is_full_computed
-        # Fall back to model method
-        return obj.is_full()
+        # Fall back to model property
+        return obj.is_full
 
     def get_can_enroll(self, obj):
         """

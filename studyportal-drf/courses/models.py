@@ -107,6 +107,7 @@ class Course(models.Model):
         """Current number of active students — used for capacity check (fallback when annotation not available)"""
         return self.enrollments.filter(is_active=True).count()
 
+    @property
     def is_full(self):
         """True if enrollment cap is reached"""
         # Use annotated value if available, otherwise compute it

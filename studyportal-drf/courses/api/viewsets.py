@@ -243,7 +243,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         """
         return (
             hasattr(user, 'is_instructor')
-            and user.is_instructor()
+            and user.is_instructor
             and self.request.query_params.get('my_courses') == 'true'
         )
 

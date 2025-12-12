@@ -21,70 +21,6 @@ from enrollments.models import Enrollment
 from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer
 
 
-class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
-    """
-    Student Enrolled Courses ViewSet
-
-    GET /api/v1/students/enrolled-courses/ - List my enrollments (paginated)
-    GET /api/v1/students/enrolled-courses/{id}/ - Get enrollment detail
-
-    Filters:
-    - ?search=python - Search in course title
-    - ?status=active - Filter by enrollment status
-
-    Permissions: Students only
-    Pagination: 10 items per page
-    """
-
-    serializer_class = EnrollmentSerializer
-    permission_classes = [IsStudent]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['status', 'is_active']
-    search_fields = ['course__title', 'course__course_code']
-    ordering_fields = ['created_at']
-    ordering = ['-created_at']
-
-    def get_queryset(self):
-        """Get enrollments for current student only"""
-        # Handle schema generation (drf-spectacular introspection)
-        if getattr(self, 'swagger_fake_view', False):
-            return Enrollment.objects.none()
-
-        return (
-            Enrollment.objects.filter(student=self.request.user, is_active=True)
-            .select_related('course', 'course__instructor')
-            .prefetch_related('course__categories')
-        )
-
-    @extend_schema(
-        summary='List my enrolled courses',
-        description="Get paginated list of courses I'm enrolled in",
-        parameters=[
-            OpenApiParameter(name='search', type=str, description='Search in course title'),
-            OpenApiParameter(name='status', type=str, description='Filter by enrollment status'),
-        ],
-        tags=['Enrollments'],
-    )
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
-    @extend_schema(
-        summary='Get enrollment detail',
-        description='Get detailed information about an enrollment',
-        parameters=[
-            OpenApiParameter(
-                name='id',
-                type=OpenApiTypes.UUID,
-                location=OpenApiParameter.PATH,
-                description='Enrollment UUID',
-            ),
-        ],
-        tags=['Enrollments'],
-    )
-    def retrieve(self, request, *args, **kwargs):
-        return super().retrieve(request, *args, **kwargs)
-
-
 class EnrollInCourseView(CommonViewSet, generics.CreateAPIView):
     """
     Enroll in Course API
@@ -168,23 +104,88 @@ class LeaveCourseView(CommonViewSet, APIView):
             return self.not_found()
 
 
-class EnrollmentActionsViewSet(viewsets.GenericViewSet):
+class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
     """
-    Router-friendly wrapper to expose enroll/leave actions alongside the
-    enrollment viewset, matching the accounts app pattern.
+    Student Enrolled Courses ViewSet
+
+    GET /api/v1/students/enrollments/ - List my enrollments (paginated)
+    GET /api/v1/students/enrollments/{id}/ - Get enrollment detail
+    POST /api/v1/students/enrollments/enroll/ - Enroll in course
+    DELETE /api/v1/students/enrollments/leave/{course_id}/ - Leave course
+
+    Filters:
+    - ?search=python - Search in course title
+    - ?status=active - Filter by enrollment status
+
+    Permissions: Students only
+    Pagination: 10 items per page
     """
 
-    serializer_class = EnrollmentCreateSerializer
+    serializer_class = EnrollmentSerializer
     permission_classes = [IsStudent]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'is_active']
+    search_fields = ['course__title', 'course__course_code']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
 
-    @extend_schema(tags=['Enrollments'], summary='Enroll in course (router action)')
+    def get_queryset(self):
+        """Get enrollments for current student only"""
+        # Handle schema generation (drf-spectacular introspection)
+        if getattr(self, 'swagger_fake_view', False):
+            return Enrollment.objects.none()
+
+        return (
+            Enrollment.objects.filter(student=self.request.user, is_active=True)
+            .select_related('course', 'course__instructor')
+            .prefetch_related('course__categories')
+        )
+
+    @extend_schema(
+        summary='List my enrolled courses',
+        description="Get paginated list of courses I'm enrolled in",
+        parameters=[
+            OpenApiParameter(name='search', type=str, description='Search in course title'),
+            OpenApiParameter(name='status', type=str, description='Filter by enrollment status'),
+        ],
+        tags=['Enrollments'],
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        summary='Get enrollment detail',
+        description='Get detailed information about an enrollment',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                description='Enrollment UUID',
+            ),
+        ],
+        tags=['Enrollments'],
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=['Enrollments'],
+        summary='Enroll in course',
+        request=EnrollmentCreateSerializer,
+        responses={
+            201: EnrollmentSerializer,
+            400: {'description': 'Validation errors'},
+        },
+    )
     @action(detail=False, methods=['post'])
     def enroll(self, request):
+        """Enroll in a course"""
         return EnrollInCourseView.as_view()(request._request)
 
     @extend_schema(
         tags=['Enrollments'],
-        summary='Leave course (router action)',
+        summary='Leave course',
         parameters=[
             OpenApiParameter(
                 name='course_id',
@@ -194,9 +195,9 @@ class EnrollmentActionsViewSet(viewsets.GenericViewSet):
             ),
         ],
     )
-    @action(detail=False, methods=['delete'], url_path='leave/(?P<course_id>[^/.]+)')
+    @action(detail=False, methods=['delete'], url_path=r'leave/(?P<course_id>[a-f0-9\-]+)')
     def leave(self, request, course_id=None):
-        # Pass through the underlying view for consistency
+        """Leave a course"""
         return LeaveCourseView.as_view()(request._request, course_id=course_id)
 
 
@@ -204,5 +205,4 @@ __all__ = [
     'StudentEnrolledCoursesViewSet',
     'EnrollInCourseView',
     'LeaveCourseView',
-    'EnrollmentActionsViewSet',
 ]

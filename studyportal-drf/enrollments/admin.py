@@ -7,13 +7,14 @@ from .models import Enrollment
 @admin.register(Enrollment)
 class EnrollmentAdmin(admin.ModelAdmin):
     """
-    Enrollment Admin
+    Admin configuration for Enrollment model.
 
     Features:
-    - View all enrollments
-    - Filter by student, course, status
-    - Search by student email, course title
-    - Colored status badges
+    - Optimized list display with colored badges
+    - Filtering by status, activity, and course status
+    - Search across student and course fields
+    - Read-only audit timestamps
+    - select_related for better performance
     """
 
     list_display = [
@@ -36,50 +37,51 @@ class EnrollmentAdmin(admin.ModelAdmin):
         'course__course_code',
     ]
     readonly_fields = ['created_at', 'updated_at']
+    list_select_related = ['student', 'course']
+    ordering = ['-created_at']
+    list_per_page = 25
 
     fieldsets = (
         ('Enrollment Information', {'fields': ('student', 'course')}),
         ('Status', {'fields': ('status', 'is_active')}),
-        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+        (
+            'Timestamps',
+            {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)},
+        ),
     )
 
-    def get_queryset(self, request):
-        """Optimize queries"""
-        return super().get_queryset(request).select_related('student', 'course')
+    # ─────────────────────────────────────────────
+    # List Display Helpers
+    # ─────────────────────────────────────────────
 
+    @admin.display(description='Student', ordering='student__email')
     def student_email(self, obj):
-        """Display student email"""
         return obj.student.email
 
-    student_email.short_description = 'Student'
-    student_email.admin_order_field = 'student__email'
-
+    @admin.display(description='Course', ordering='course__title')
     def course_title(self, obj):
-        """Display course title"""
         return f'{obj.course.course_code} - {obj.course.title}'
 
-    course_title.short_description = 'Course'
-    course_title.admin_order_field = 'course__title'
-
+    @admin.display(description='Status')
     def status_badge(self, obj):
-        """Display colored status badge"""
         colors = {
             'active': '#28a745',
             'completed': '#17a2b8',
             'dropped': '#dc3545',
         }
         return format_html(
-            '<span style="background-color: {}; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>',
+            '<span style="background-color: {}; color: white; '
+            'padding: 3px 10px; border-radius: 3px;">{}</span>',
             colors.get(obj.status, '#6c757d'),
             obj.get_status_display(),
         )
 
-    status_badge.short_description = 'Status'
-
+    @admin.display(description='Active')
     def is_active_badge(self, obj):
-        """Display active status"""
-        if obj.is_active:
-            return format_html('<span style="color: green;">Active</span>')
-        return format_html('<span style="color: red;">Inactive</span>')
-
-    is_active_badge.short_description = 'Active'
+        color = 'green' if obj.is_active else 'red'
+        label = 'Active' if obj.is_active else 'Inactive'
+        return format_html(
+            '<span style="color: {};">{}</span>',
+            color,
+            label,
+        )

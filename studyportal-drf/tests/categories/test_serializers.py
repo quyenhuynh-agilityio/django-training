@@ -1,6 +1,6 @@
 import pytest
 
-from categories.api.serializers import CategorySerializer
+from categories.api.serializes.category import CategorySerializer
 
 pytestmark = pytest.mark.django_db
 

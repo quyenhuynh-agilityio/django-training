@@ -74,10 +74,12 @@ class User(AbstractUser):
             return f'{self.first_name} {self.last_name}'.strip()
         return self.email.split('@')[0]
 
+    @property
     def is_student(self):
         """Check if user is a student"""
         return self.role == 'student'
 
+    @property
     def is_instructor(self):
         """Check if user is an instructor"""
         return self.role == 'instructor'

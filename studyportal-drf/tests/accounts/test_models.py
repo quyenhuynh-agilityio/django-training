@@ -19,8 +19,8 @@ def test_role_helpers(create_user):
     student = create_user(email='s@example.com', username='student1', role='student')
     instructor = create_user(email='i@example.com', username='instructor1', role='instructor')
 
-    assert student.is_student() is True
-    assert instructor.is_instructor() is True
+    assert student.is_student is True
+    assert instructor.is_instructor is True
 
 
 def test_clean_lowercases_email(create_user):

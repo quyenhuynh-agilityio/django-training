@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from courses.models import Course
+
 
 class Enrollment(models.Model):
     """
@@ -69,7 +71,7 @@ class Enrollment(models.Model):
         if not self.course.can_enroll():
             if not self.course.is_active:
                 raise ValidationError('This course is not active.')
-            if self.course.status == self.STATUS_DROPPED:
+            if self.course.status != Course.STATUS_ACTIVE:
                 raise ValidationError('This course is not open for enrollment.')
             if self.course.is_full:
                 raise ValidationError('This course has reached maximum capacity.')
