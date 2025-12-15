@@ -4,8 +4,8 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.html import format_html
 
-from accounts.models import User
 from enrollments.models import Enrollment
+from users.models import User
 
 from .models import Course
 

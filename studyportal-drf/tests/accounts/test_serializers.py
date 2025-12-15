@@ -4,7 +4,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 
-from accounts.api.serializers import (
+from users.api.serializers import (
     ChangePasswordSerializer,
     PasswordResetConfirmSerializer,
     UserLoginSerializer,

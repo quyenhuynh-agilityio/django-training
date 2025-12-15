@@ -57,3 +57,18 @@ class CommonViewSet:
         }
 
         return Response(data=response_data, status=status.HTTP_400_BAD_REQUEST)
+
+    def server_error(self, message=None, code=None):
+        """
+        Return internal server error with message content & code
+        """
+        # Build up the error content.
+        response_data = {
+            'errors': {
+                'developerMessage': 'API is not working properly.',
+                'message': [message],
+                'code': code,
+            },
+        }
+
+        return Response(data=response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

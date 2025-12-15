@@ -11,19 +11,22 @@ Serializers for authentication-related operations:
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
-from .mixins import (
-    PasswordConfirmationMixin,
-    StripAndLowerEmailMixin,
-    StripNameMixin,
-    UIDAndTokenValidatorMixin,
+from utils.serializers import AuditReadOnlyFieldsMixin
+
+from .validators import (
+    EmailNormalization,
+    NameValidation,
+    PasswordConfirmation,
+    ResetTokenValidation,
 )
 
 User = get_user_model()
 
 
 class UserRegistrationSerializer(
-    StripAndLowerEmailMixin, StripNameMixin, PasswordConfirmationMixin, serializers.ModelSerializer
+    EmailNormalization, NameValidation, PasswordConfirmation, serializers.ModelSerializer
 ):
     """
     Handles new student registration.
@@ -39,7 +42,7 @@ class UserRegistrationSerializer(
 
     password = serializers.CharField(
         write_only=True,
-        validators=[validate_password],  # apply Django's password policy
+        validators=[validate_password],
         style={'input_type': 'password'},
     )
     password_confirm = serializers.CharField(
@@ -66,45 +69,40 @@ class UserRegistrationSerializer(
             'last_name': {'required': True},
         }
 
-    # ---- Field-level validations ---------------------------------------------------------
+    # Use DRF's built-in UniqueValidator to avoid race conditions
+    email = serializers.EmailField(
+        validators=[UniqueValidator(queryset=User.objects.all())],
+        required=True,
+    )
+    username = serializers.CharField(
+        validators=[UniqueValidator(queryset=User.objects.all())],
+        required=True,
+    )
 
-    def validate_email(self, value):
-        """
-        Normalize and ensure email is unique.
-        """
-        value = self.normalize_email(value)
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('Email already exists.')
-        return value
+    # ---- Field-level validations ---------------------------------------------------------
 
     def validate_username(self, value):
         """
-        Validate username:
-        - Must contain only alphanumeric characters or underscores
-        - Must be unique
+        Additional username format validation on top of UniqueValidator.
         """
         value = value.strip()
         if not value.replace('_', '').isalnum():
             raise serializers.ValidationError(
                 'Username may contain letters, numbers, and underscores only.'
             )
-        if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError('Username already exists.')
         return value
 
     def validate_first_name(self, value):
-        return self.clean_name(value, 'First name')
+        return self.validate_name(value, 'First name')
 
     def validate_last_name(self, value):
-        return self.clean_name(value, 'Last name')
+        return self.validate_name(value, 'Last name')
 
     # ---- Object-level validation ----------------------------------------------------------
 
     def validate(self, attrs):
-        """
-        Validate password confirmation.
-        """
-        self.validate_password_confirmation(attrs['password'], attrs['password_confirm'])
+        """Validate password confirmation."""
+        self.check_password_match(attrs['password'], attrs['password_confirm'])
         return attrs
 
     # ---- Create User ---------------------------------------------------------------------
@@ -120,7 +118,7 @@ class UserRegistrationSerializer(
         return User.objects.create_user(role='student', **validated_data)
 
 
-class UserLoginSerializer(StripAndLowerEmailMixin, serializers.Serializer):
+class UserLoginSerializer(EmailNormalization, serializers.Serializer):
     """
     Authenticates user based on email + password.
 
@@ -146,7 +144,6 @@ class UserLoginSerializer(StripAndLowerEmailMixin, serializers.Serializer):
         email = attrs['email']
         password = attrs['password']
 
-        # Get user if exists, but quietly return generic message on failure
         user = User.objects.filter(email=email).first()
 
         if not user or not user.check_password(password):
@@ -159,14 +156,14 @@ class UserLoginSerializer(StripAndLowerEmailMixin, serializers.Serializer):
         return attrs
 
 
-class PasswordResetRequestSerializer(StripAndLowerEmailMixin, serializers.Serializer):
+class PasswordResetRequestSerializer(EmailNormalization, serializers.Serializer):
     """
     Accepts an email for initiating password reset.
 
     Security Best Practice:
     -----------------------
     Do NOT check whether the email exists.
-       API should always return success to prevent revealing registered emails.
+    API should always return success to prevent revealing registered emails.
     """
 
     email = serializers.EmailField()
@@ -176,7 +173,7 @@ class PasswordResetRequestSerializer(StripAndLowerEmailMixin, serializers.Serial
 
 
 class PasswordResetConfirmSerializer(
-    PasswordConfirmationMixin, UIDAndTokenValidatorMixin, serializers.Serializer
+    PasswordConfirmation, ResetTokenValidation, serializers.Serializer
 ):
     """
     Validates reset token and allows setting a new password.
@@ -203,16 +200,15 @@ class PasswordResetConfirmSerializer(
 
     def validate(self, attrs):
         # Step 1: confirm new passwords match
-        self.validate_password_confirmation(attrs['new_password'], attrs['new_password_confirm'])
+        self.check_password_match(attrs['new_password'], attrs['new_password_confirm'])
 
-        # Step 2–3: validate UID + token
-        user = self.validate_uid_and_token(attrs['uid'], attrs['token'])
-
+        # Step 2-3: validate UID + token
+        user = self.validate_reset_token(attrs['uid'], attrs['token'])
         attrs['user'] = user
         return attrs
 
 
-class ChangePasswordSerializer(PasswordConfirmationMixin, serializers.Serializer):
+class ChangePasswordSerializer(PasswordConfirmation, serializers.Serializer):
     """
     Allows already authenticated users to change their password.
 
@@ -229,14 +225,56 @@ class ChangePasswordSerializer(PasswordConfirmationMixin, serializers.Serializer
     )
     new_password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
+    def validate_old_password(self, value):
+        """
+        Critical: Verify that the provided old password is correct.
+        """
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Old password is incorrect.')
+        return value
+
     def validate(self, attrs):
         # Confirm new passwords match
-        self.validate_password_confirmation(attrs['new_password'], attrs['new_password_confirm'])
+        self.check_password_match(attrs['new_password'], attrs['new_password_confirm'])
 
-        # Ensure new password differs from old password
+        # New password must be different from old
         if attrs['old_password'] == attrs['new_password']:
             raise serializers.ValidationError(
                 {'new_password': 'New password must be different from the old password.'}
             )
 
         return attrs
+
+
+class UserProfileSerializer(AuditReadOnlyFieldsMixin, serializers.ModelSerializer):
+    """
+    Returns full user profile details.
+
+    All fields are read-only to avoid unintended data exposure.
+    """
+
+    full_name = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'email',
+            'username',
+            'first_name',
+            'last_name',
+            'full_name',
+            'role',
+            'is_active',
+            'date_joined',
+            'created_at',
+        ]
+        read_only_fields = AuditReadOnlyFieldsMixin.audit_fields(
+            'email',
+            'username',
+            'role',
+            'is_active',
+            'date_joined',
+            include_updated=False,
+        )

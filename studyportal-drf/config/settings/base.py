@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_spectacular',
     # Local apps
-    'accounts.apps.AccountsConfig',
+    'users.apps.UsersConfig',
     'courses.apps.CoursesConfig',
     'categories.apps.CategoriesConfig',
     'enrollments.apps.EnrollmentsConfig',
@@ -105,7 +105,7 @@ DATABASES = {
 # ==============================
 # AUTH & PASSWORDS
 # ==============================
-AUTH_USER_MODEL = 'accounts.User'
+AUTH_USER_MODEL = 'users.User'
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
