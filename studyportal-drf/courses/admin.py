@@ -200,15 +200,13 @@ class CourseAdmin(admin.ModelAdmin):
         # Color based on capacity
         if obj.is_full:
             color = '#dc3545'  # Red - Full
-
         elif count > 0:
             color = '#28a745'  # Green - Has students
-
         else:
             color = '#6c757d'  # Gray - Empty
 
         return format_html(
-            '<span style="color:{}; font-weight:600;">{} {}/{}</span> {}',
+            '<span style="color:{}; font-weight:600;">{}/{}</span> {}',
             color,
             count,
             max_students,
@@ -266,23 +264,19 @@ class CourseAdmin(admin.ModelAdmin):
             '<div style="padding:10px; background:#f8f9fa; border-radius:4px;">'
             '<strong style="display:block; margin-bottom:8px;">{}</strong>'
             '<ul style="margin:0; padding-left:20px;">'
-            '<li><strong>{} {}:</strong> {}</li>'
-            '<li><strong>{} {}:</strong> {}</li>'
-            '<li><strong>{} {}:</strong> {}</li>'
-            '<li><strong>{} {}:</strong> {}</li>'
+            '<li><strong>{}:</strong> {}</li>'
+            '<li><strong>{}:</strong> {}</li>'
+            '<li><strong>{}:</strong> {}</li>'
+            '<li><strong>{}:</strong> {}</li>'
             '</ul>'
             '</div>',
             _('Enrollment Summary'),
-            '✓',
             _('Active'),
             active,
-            '✓',
             _('Completed'),
             completed,
-            '✗',
             _('Dropped'),
             dropped,
-            '∑',
             _('Total'),
             total,
         )
@@ -291,7 +285,7 @@ class CourseAdmin(admin.ModelAdmin):
     #   B U L K   A C T I O N S
     # ═══════════════════════════════════════════════════════════════════════════
 
-    @admin.action(description=_('✓ Activate selected courses'))
+    @admin.action(description=_('Activate selected courses'))
     def activate_courses(self, request, queryset):
         """Bulk activate selected courses"""
         updated = queryset.update(is_active=True)
@@ -301,7 +295,7 @@ class CourseAdmin(admin.ModelAdmin):
             level='success',
         )
 
-    @admin.action(description=_('✗ Deactivate selected courses'))
+    @admin.action(description=_('Deactivate selected courses'))
     def deactivate_courses(self, request, queryset):
         """
         Bulk deactivate selected courses.

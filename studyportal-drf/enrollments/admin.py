@@ -148,21 +148,13 @@ class EnrollmentAdmin(admin.ModelAdmin):
             Enrollment.STATUS_DROPPED: '#dc3545',  # Red
         }
 
-        icons = {
-            Enrollment.STATUS_ACTIVE: '',
-            Enrollment.STATUS_COMPLETED: '',
-            Enrollment.STATUS_DROPPED: '',
-        }
-
         color = colors.get(obj.status, '#6c757d')
-        icon = icons.get(obj.status, '○')
 
         return format_html(
             '<span style="background-color:{}; color:white; '
             'padding:4px 12px; border-radius:4px; font-weight:500; '
-            'display:inline-block;">{} {}</span>',
+            'display:inline-block;">{}</span>',
             color,
-            icon,
             obj.get_status_display(),
         )
 
@@ -228,7 +220,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
     #   B U L K   A C T I O N S
     # ═══════════════════════════════════════════════════════════════════════════
 
-    @admin.action(description=_('✓ Mark as Active'))
+    @admin.action(description=_('Mark as Active'))
     def mark_as_active(self, request, queryset):
         """Bulk set enrollment status to active"""
         updated = queryset.update(status=Enrollment.STATUS_ACTIVE, is_active=True)
@@ -238,7 +230,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
             level='success',
         )
 
-    @admin.action(description=_('★ Mark as Completed'))
+    @admin.action(description=_('Mark as Completed'))
     def mark_as_completed(self, request, queryset):
         """Bulk set enrollment status to completed"""
         updated = queryset.filter(is_active=True).update(status=Enrollment.STATUS_COMPLETED)
@@ -248,7 +240,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
             level='success',
         )
 
-    @admin.action(description=_('✗ Mark as Dropped'))
+    @admin.action(description=_('Mark as Dropped'))
     def mark_as_dropped(self, request, queryset):
         """Bulk set enrollment status to dropped and deactivate"""
         updated = queryset.update(status=Enrollment.STATUS_DROPPED, is_active=False)
@@ -258,7 +250,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
             level='warning',
         )
 
-    @admin.action(description=_('↻ Reactivate enrollments'))
+    @admin.action(description=_('Reactivate enrollments'))
     def reactivate_enrollments(self, request, queryset):
         """
         Reactivate previously dropped enrollments.
