@@ -85,6 +85,7 @@ class EnrolledStudentSerializer(EnrollmentBaseSerializer):
 class EnrollmentCreateSerializer(serializers.Serializer):
     """
     Create serializer for new student enrollments.
+    Uses write_only course_id, returns full EnrollmentSerializer.
     """
 
     course_id = serializers.UUIDField(
@@ -92,16 +93,22 @@ class EnrollmentCreateSerializer(serializers.Serializer):
         help_text='UUID of the course to enroll in',
     )
 
-    def validate(self, attrs):
+    def validate_course_id(self, value):
+        """Validate that course exists and is accessible"""
         from courses.models import Course
 
-        course_id = attrs['course_id']
-        student = self.context['request'].user
+        try:
+            course = Course.objects.get(id=value)
+        except Course.DoesNotExist:
+            raise serializers.ValidationError('Course not found.')  # noqa: B904
 
-        # --- Course existence -------------------------------------------------
-        course = Course.objects.filter(id=course_id).first()
-        if not course:
-            raise serializers.ValidationError({'course_id': 'Course not found.'})
+        return course  # Return the course object for reuse
+
+    def validate(self, attrs):
+        """Validate enrollment business rules"""
+        # course_id is now a Course object from validate_course_id
+        course = attrs['course_id']
+        student = self.context['request'].user
 
         # --- Business rules ---------------------------------------------------
         if not course.can_enroll():
@@ -134,20 +141,18 @@ class EnrollmentCreateSerializer(serializers.Serializer):
                 {'course_id': 'You are already enrolled in this course.'}
             )
 
-        # Pass objects forward to create()
+        # Store for create method
         attrs['course'] = course
         attrs['student'] = student
         return attrs
 
-    # ----------------------------------------------------------------------
-
     def create(self, validated_data):
         """Create enrollment with race-condition protection."""
-        course = validated_data.pop('course')
-        student = validated_data.pop('student')
-        validated_data.pop('course_id')
+        course = validated_data['course']
+        student = validated_data['student']
 
         with transaction.atomic():
+            # Lock the course row to prevent race conditions
             locked_course = course.__class__.objects.select_for_update().get(pk=course.pk)
 
             # Re-check constraints under DB lock
@@ -165,8 +170,14 @@ class EnrollmentCreateSerializer(serializers.Serializer):
                     {'course_id': 'You are already enrolled in this course.'}
                 )
 
-            return Enrollment.objects.create(
+            # Create the enrollment
+            enrollment = Enrollment.objects.create(
                 student=student,
                 course=locked_course,
-                **validated_data,
             )
+
+            return enrollment
+
+    def to_representation(self, instance):
+        """Return full enrollment data with course info"""
+        return EnrollmentSerializer(instance, context=self.context).data

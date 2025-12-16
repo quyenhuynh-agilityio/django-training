@@ -5,22 +5,22 @@ This module provides ViewSet for Course CRUD operations with proper
 query optimization, permissions, and custom actions.
 
 Architecture:
-- Uses CommonViewSet for consistent response handling
 - Implements action-based serializer/permission selection
 - Optimizes queries with annotations for computed fields
 - Supports role-based filtering (anonymous, authenticated, instructor)
 """
 
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from django.db.models import BooleanField, Case, Count, F, Q, Value, When
 from django.utils.translation import gettext_lazy as _
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
 
-from core.api_views import CommonViewSet
 from courses.models import Course
 from enrollments.api.serializers import EnrolledStudentSerializer
 from enrollments.models import Enrollment
@@ -34,7 +34,7 @@ from .serializers import (
 )
 
 
-class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
+class CourseViewSet(viewsets.ModelViewSet):
     """
     Course ViewSet - Full CRUD operations with custom actions.
 
@@ -75,47 +75,27 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     ordering = ['-created_at']
     lookup_field = 'pk'
 
-    # Action-based serializer mapping
-    serializer_action_classes = {
-        'list': CourseListSerializer,
-        'retrieve': CourseDetailSerializer,
-        'create': CourseWriteSerializer,
-        'update': CourseWriteSerializer,
-        'partial_update': CourseWriteSerializer,
-        'enrolled_students': EnrolledStudentSerializer,
-    }
-
-    # Action-based permission mapping
-    permission_action_classes = {
-        'enrolled_students': [permissions.IsAuthenticated, IsInstructorOrReadOnly],
-    }
-
     # ═══════════════════════════════════════════════════════════════════════════
     #   P E R M I S S I O N S  &  S E R I A L I Z E R S
     # ═══════════════════════════════════════════════════════════════════════════
 
     def get_permissions(self):
-        """
-        Return appropriate permissions based on action.
-
-        Returns:
-            List of permission instances
-        """
-        if self.action in self.permission_action_classes:
-            return [perm() for perm in self.permission_action_classes[self.action]]
+        """Return appropriate permissions based on action"""
+        if self.action == 'enrolled_students':
+            return [permissions.IsAuthenticated(), IsInstructorOrReadOnly()]
         return super().get_permissions()
 
     def get_serializer_class(self):
-        """
-        Return appropriate serializer based on action.
-
-        Returns:
-            Serializer class for the current action
-        """
-        return self.serializer_action_classes.get(
-            self.action,
-            CourseWriteSerializer,  # Default fallback
-        )
+        """Return appropriate serializer based on action"""
+        serializer_action_classes = {
+            'list': CourseListSerializer,
+            'retrieve': CourseDetailSerializer,
+            'create': CourseWriteSerializer,
+            'update': CourseWriteSerializer,
+            'partial_update': CourseWriteSerializer,
+            'enrolled_students': EnrolledStudentSerializer,
+        }
+        return serializer_action_classes.get(self.action, CourseWriteSerializer)
 
     # ═══════════════════════════════════════════════════════════════════════════
     #   Q U E R Y S E T   B U I L D E R
@@ -217,10 +197,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         if not user.is_authenticated:
             # Anonymous users: Only active courses with status=active
-            return queryset.filter(
-                is_active=True,
-                status=Course.STATUS_ACTIVE,
-            )
+            return queryset.filter(is_active=True, status=Course.STATUS_ACTIVE)
 
         # Authenticated users: All active courses
         queryset = queryset.filter(is_active=True)
@@ -232,15 +209,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         return queryset
 
     def _should_filter_my_courses(self, user):
-        """
-        Check if queryset should be filtered to show only instructor's own courses.
-
-        Args:
-            user: Current authenticated user
-
-        Returns:
-            True if should filter to own courses, False otherwise
-        """
+        """Check if queryset should be filtered to show only instructor's own courses"""
         return (
             hasattr(user, 'is_instructor')
             and user.is_instructor
@@ -248,18 +217,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         )
 
     def _apply_query_param_filters(self, queryset):
-        """
-        Apply additional filters from query parameters.
-
-        Supported filters:
-            - category: Filter by category UUID
-
-        Args:
-            queryset: QuerySet to filter
-
-        Returns:
-            Filtered QuerySet
-        """
+        """Apply additional filters from query parameters"""
         category_id = self.request.query_params.get('category')
         if category_id:
             queryset = queryset.filter(categories__id=category_id)
@@ -274,9 +232,6 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         """
         Create course and set instructor from request user.
 
-        Args:
-            serializer: CourseWriteSerializer instance
-
         Note:
             The serializer will call model's save() which triggers full_clean()
             for additional validation (e.g., instructor role check).
@@ -286,11 +241,25 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     @extend_schema(
         summary='Soft delete a course',
         description=(
-            'Cannot delete courses in progress with enrolled students. '
-            "Uses model's soft_delete() method (sets is_active=False)."
+            'Marks a course as inactive (soft delete). '
+            'Cannot delete courses in progress with enrolled students.'
         ),
         tags=['Courses'],
-        responses={200: CourseDetailSerializer},
+        responses={
+            200: {
+                'description': 'Course deleted successfully',
+                'content': {
+                    'application/json': {
+                        'example': {
+                            'message': 'Course deleted successfully.',
+                            'course_id': '123e4567-e89b-12d3-a456-426614174000',
+                            'course_code': 'CS101',
+                        }
+                    }
+                },
+            },
+            400: {'description': 'Cannot delete course in progress with students'},
+        },
     )
     def destroy(self, request, *args, **kwargs):
         """
@@ -307,24 +276,32 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         course = self.get_object()
 
         # Check if course can be deleted
-        # Use annotated value if available, otherwise fall back to model property
-        enrolled = getattr(course, 'enrolled_count_computed', course._enrolled_count)
+        # Use annotated value if available, otherwise query enrollments
+        enrolled = getattr(
+            course, 'enrolled_count_computed', course.enrollments.filter(is_active=True).count()
+        )
 
         if course.status == Course.STATUS_IN_PROGRESS and enrolled > 0:
-            return self.bad_request(
-                message=_('Cannot delete a course that is in progress with enrolled students.'),
-                code='COURSE_IN_PROGRESS_WITH_STUDENTS',
+            return Response(
+                {
+                    'message': _(
+                        'Cannot delete a course that is in progress with enrolled students.'
+                    ),
+                    'code': 'COURSE_IN_PROGRESS_WITH_STUDENTS',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Perform soft delete
         course.soft_delete()
 
-        return self.ok(
+        return Response(
             {
                 'message': _('Course deleted successfully.'),
                 'course_id': str(course.id),
                 'course_code': course.course_code,
-            }
+            },
+            status=status.HTTP_200_OK,
         )
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -336,6 +313,14 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         description='Get paginated list of all enrolled students in a course. '
         'Only accessible by the course instructor.',
         tags=['Courses'],
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                description='Course UUID',
+            ),
+        ],
         responses={
             200: EnrolledStudentSerializer(many=True),
             403: {'description': 'Only course instructor can view enrolled students'},
@@ -369,11 +354,12 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         # Verify user is the course instructor
         if course.instructor != request.user:
-            return self.forbidden(
+            return Response(
                 {
                     'error': _('Only the course instructor can view enrolled students.'),
                     'code': 'INSTRUCTOR_ONLY',
-                }
+                },
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         # Get active enrollments with student details
@@ -386,12 +372,12 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         # Apply pagination
         page = self.paginate_queryset(enrollments)
         if page is not None:
-            serializer = EnrolledStudentSerializer(page, many=True)
+            serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
         # Return all results if pagination is disabled
-        serializer = EnrolledStudentSerializer(enrollments, many=True)
-        return self.ok(serializer.data)
+        serializer = self.get_serializer(enrollments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     # ═══════════════════════════════════════════════════════════════════════════
     #   S W A G G E R   D O C U M E N T A T I O N
@@ -419,7 +405,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
             ),
             OpenApiParameter(
                 name='my_courses',
-                type=bool,
+                type=OpenApiTypes.BOOL,
                 description='(Instructors only) Show only courses I created',
                 required=False,
             ),
@@ -434,7 +420,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         responses={200: CourseListSerializer(many=True)},
     )
     def list(self, request, *args, **kwargs):
-        """List courses with filters and pagination."""
+        """List courses with filters and pagination"""
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
@@ -445,7 +431,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         responses={200: CourseDetailSerializer},
     )
     def retrieve(self, request, *args, **kwargs):
-        """Get detailed course information."""
+        """Get detailed course information"""
         return super().retrieve(request, *args, **kwargs)
 
     @extend_schema(
@@ -461,7 +447,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         },
     )
     def create(self, request, *args, **kwargs):
-        """Create a new course."""
+        """Create a new course"""
         return super().create(request, *args, **kwargs)
 
     @extend_schema(
@@ -476,7 +462,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         },
     )
     def update(self, request, *args, **kwargs):
-        """Full update of a course."""
+        """Full update of a course"""
         return super().update(request, *args, **kwargs)
 
     @extend_schema(
@@ -491,7 +477,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         },
     )
     def partial_update(self, request, *args, **kwargs):
-        """Partial update of a course."""
+        """Partial update of a course"""
         return super().partial_update(request, *args, **kwargs)
 
 

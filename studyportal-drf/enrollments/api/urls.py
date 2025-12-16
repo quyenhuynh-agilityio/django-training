@@ -1,11 +1,24 @@
+"""
+Enrollment API URLs
+
+Router configuration for enrollment endpoints following DRF best practices.
+"""
+
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from enrollments.api.viewsets import StudentEnrolledCoursesViewSet
+from .views import StudentEnrolledCoursesViewSet
 
-# Router for ViewSet
+# Create router
 router = DefaultRouter()
 
-# Enrollment listing, details, and actions (enroll/leave)
-router.register(r'students/enrollments', StudentEnrolledCoursesViewSet, basename='enrollment')
+# Register viewset
+router.register(
+    r'students/enrollments', StudentEnrolledCoursesViewSet, basename='student-enrollments'
+)
 
-urlpatterns = router.urls
+app_name = 'enrollments'
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
