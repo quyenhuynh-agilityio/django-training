@@ -1,3 +1,3 @@
-from .views import CourseViewSet
+from .viewsets import CourseViewSet
 
 __all__ = ['CourseViewSet']

@@ -7,7 +7,7 @@ Routes all authentication endpoints through DRF router.
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from users.api.views import AuthViewSet
+from users.api.viewsets import AuthViewSet
 
 # Create router for ViewSet
 router = DefaultRouter()

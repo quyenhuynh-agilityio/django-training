@@ -100,7 +100,7 @@ def test_password_reset_request_view_sends_email(monkeypatch, api_client, create
         send_mail_calls['called'] = True
         return 1
 
-    monkeypatch.setattr('accounts.api.views.send_mail', fake_send_mail)
+    monkeypatch.setattr('accounts.api.viewsets.send_mail', fake_send_mail)
 
     response = api_client.post(
         reverse('password_reset'), {'email': 'reset@example.com'}, format='json'

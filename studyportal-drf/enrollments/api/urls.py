@@ -7,7 +7,7 @@ Router configuration for enrollment endpoints following DRF best practices.
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import StudentEnrolledCoursesViewSet
+from .viewsets import StudentEnrolledCoursesViewSet
 
 # Create router
 router = DefaultRouter()
