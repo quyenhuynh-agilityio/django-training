@@ -1,9 +1,10 @@
 """
-Course Read Serializers
+Course Serializers
 
-Serializers for read-only operations (list and detail views):
+Serializers for course CRUD operations:
 - CourseListSerializer: Optimized for list views
 - CourseDetailSerializer: Complete course details
+- CourseWriteSerializer: Create and update operations
 - InstructorSerializer: Instructor information
 """
 
@@ -15,13 +16,9 @@ from rest_framework import serializers
 from categories.api.serializers import CategorySerializer
 from categories.models import Category
 from courses.models import Course
-from utils.serializers import AuditReadOnlyFieldsMixin
+from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
-from .mixins import (
-    CategoryNamesMixin,
-    CourseCategoriesReadOnlyMixin,
-    CourseEnrollmentComputedMixin,
-)
+from .bases import CategoryNamesFieldBase, CourseEnrollmentFieldsBase
 
 User = get_user_model()
 
@@ -41,15 +38,12 @@ class InstructorSerializer(serializers.ModelSerializer):
 
 
 class CourseListSerializer(
-    AuditReadOnlyFieldsMixin,
-    CourseEnrollmentComputedMixin,
-    CourseCategoriesReadOnlyMixin,
-    serializers.ModelSerializer,
+    AuditFieldsBase, CourseEnrollmentFieldsBase, serializers.ModelSerializer
 ):
     """
     Lightweight serializer for course list views.
 
-    Optimized for performance with computed enrollment fields from mixins.
+    Optimized for performance with computed enrollment fields.
     Includes nested categories for filtering.
 
     Queryset Requirements:
@@ -80,21 +74,16 @@ class CourseListSerializer(
             'max_students',
             'created_at',
         ]
-        read_only_fields = AuditReadOnlyFieldsMixin.audit_fields(include_updated=False)
+        read_only_fields = audit_read_only_fields(include_updated=False)
 
 
 class CourseDetailSerializer(
-    AuditReadOnlyFieldsMixin,
-    CourseEnrollmentComputedMixin,
-    CategoryNamesMixin,
-    CourseCategoriesReadOnlyMixin,
-    serializers.ModelSerializer,
+    AuditFieldsBase, CourseEnrollmentFieldsBase, CategoryNamesFieldBase, serializers.ModelSerializer
 ):
     """
     Complete serializer for single course detail views.
 
     Includes all course information with nested related objects.
-    Uses multiple mixins for enrollment stats, categories, and category names.
 
     Queryset Requirements:
         - select_related('instructor')
@@ -126,7 +115,7 @@ class CourseDetailSerializer(
             'created_at',
             'updated_at',
         ]
-        read_only_fields = AuditReadOnlyFieldsMixin.audit_fields()
+        read_only_fields = audit_read_only_fields()
 
 
 class CourseWriteSerializer(serializers.ModelSerializer):
@@ -214,23 +203,47 @@ class CourseWriteSerializer(serializers.ModelSerializer):
         }
 
     def validate_course_code(self, value):
-        """Normalize course code to uppercase"""
-        return value.upper() if value else value
+        """Normalize course code to uppercase and validate uniqueness"""
+        if not value or not value.strip():
+            raise serializers.ValidationError(_('Course code cannot be empty.'))
+
+        # Normalize to uppercase
+        code = value.upper().strip()
+
+        # Validate format
+        import re
+
+        if not re.match(r'^[A-Z0-9_-]+$', code):
+            raise serializers.ValidationError(
+                _('Course code can only contain letters, numbers, hyphens, and underscores.')
+            )
+
+        # Check uniqueness
+        queryset = Course.objects.filter(course_code=code)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                _('Course code "%(code)s" already exists.') % {'code': code}
+            )
+
+        return code
 
     def validate_category_ids(self, value):
         """Validate that all category IDs exist and are active"""
         if not value:
             return []
 
-        # Check if all categories exist and are active
-        existing_categories = Category.objects.filter(id__in=value, is_active=True).values_list(
-            'id', flat=True
+        # Remove duplicates while preserving order
+        unique_ids = list(dict.fromkeys(value))
+
+        # Check existing categories
+        existing_ids = set(
+            Category.objects.filter(id__in=unique_ids, is_active=True).values_list('id', flat=True)
         )
 
-        existing_set = set(existing_categories)
-        provided_set = set(value)
-
-        missing_ids = provided_set - existing_set
+        missing_ids = set(unique_ids) - existing_ids
 
         if missing_ids:
             raise serializers.ValidationError(
@@ -238,7 +251,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
                 % {'ids': ', '.join(str(id) for id in missing_ids)}
             )
 
-        return value
+        return unique_ids
 
     def validate_max_students(self, value):
         """Validate that max_students is positive or null"""
@@ -397,8 +410,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
 
         # Associate categories
         if category_ids:
-            categories = Category.objects.filter(id__in=category_ids)
-            course.categories.set(categories)
+            course.categories.set(category_ids)
 
         return course
 
@@ -420,8 +432,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
 
         # Update categories if provided
         if category_ids is not None:
-            categories = Category.objects.filter(id__in=category_ids)
-            instance.categories.set(categories)
+            instance.categories.set(category_ids)
 
         instance.refresh_from_db()
         return instance

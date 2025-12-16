@@ -6,6 +6,7 @@ Serializers for authentication-related operations:
 - Login
 - Password reset (request and confirm)
 - Change password
+- User profile
 """
 
 from django.contrib.auth import get_user_model
@@ -13,20 +14,23 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from utils.serializers import AuditReadOnlyFieldsMixin
+from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
-from .validators import (
-    EmailNormalization,
-    NameValidation,
-    PasswordConfirmation,
-    ResetTokenValidation,
+from .bases import (
+    EmailNormalizationBase,
+    NameValidationBase,
+    PasswordConfirmationBase,
+    ResetTokenValidationBase,
 )
 
 User = get_user_model()
 
 
 class UserRegistrationSerializer(
-    EmailNormalization, NameValidation, PasswordConfirmation, serializers.ModelSerializer
+    EmailNormalizationBase,
+    NameValidationBase,
+    PasswordConfirmationBase,
+    serializers.ModelSerializer,
 ):
     """
     Handles new student registration.
@@ -44,10 +48,22 @@ class UserRegistrationSerializer(
         write_only=True,
         validators=[validate_password],
         style={'input_type': 'password'},
+        help_text='Password must meet strength requirements',
     )
     password_confirm = serializers.CharField(
-        write_only=True,
-        style={'input_type': 'password'},
+        write_only=True, style={'input_type': 'password'}, help_text='Must match password'
+    )
+
+    # Use DRF's built-in UniqueValidator to avoid race conditions
+    email = serializers.EmailField(
+        validators=[UniqueValidator(queryset=User.objects.all())],
+        required=True,
+        help_text='Must be unique',
+    )
+    username = serializers.CharField(
+        validators=[UniqueValidator(queryset=User.objects.all())],
+        required=True,
+        help_text='Must be unique, alphanumeric with underscores',
     )
 
     class Meta:
@@ -69,22 +85,12 @@ class UserRegistrationSerializer(
             'last_name': {'required': True},
         }
 
-    # Use DRF's built-in UniqueValidator to avoid race conditions
-    email = serializers.EmailField(
-        validators=[UniqueValidator(queryset=User.objects.all())],
-        required=True,
-    )
-    username = serializers.CharField(
-        validators=[UniqueValidator(queryset=User.objects.all())],
-        required=True,
-    )
-
-    # ---- Field-level validations ---------------------------------------------------------
+    def validate_email(self, value):
+        """Normalize email to lowercase"""
+        return self.normalize_email(value)
 
     def validate_username(self, value):
-        """
-        Additional username format validation on top of UniqueValidator.
-        """
+        """Validate username format"""
         value = value.strip()
         if not value.replace('_', '').isalnum():
             raise serializers.ValidationError(
@@ -93,19 +99,25 @@ class UserRegistrationSerializer(
         return value
 
     def validate_first_name(self, value):
+        """Validate and normalize first name"""
         return self.validate_name(value, 'First name')
 
     def validate_last_name(self, value):
+        """Validate and normalize last name"""
         return self.validate_name(value, 'Last name')
 
-    # ---- Object-level validation ----------------------------------------------------------
+    # ───────────────────────────────────────────────────────────────────────
+    # Object-level Validation
+    # ───────────────────────────────────────────────────────────────────────
 
     def validate(self, attrs):
-        """Validate password confirmation."""
+        """Validate password confirmation"""
         self.check_password_match(attrs['password'], attrs['password_confirm'])
         return attrs
 
-    # ---- Create User ---------------------------------------------------------------------
+    # ───────────────────────────────────────────────────────────────────────
+    # Create User
+    # ───────────────────────────────────────────────────────────────────────
 
     def create(self, validated_data):
         """
@@ -118,7 +130,7 @@ class UserRegistrationSerializer(
         return User.objects.create_user(role='student', **validated_data)
 
 
-class UserLoginSerializer(EmailNormalization, serializers.Serializer):
+class UserLoginSerializer(EmailNormalizationBase, serializers.Serializer):
     """
     Authenticates user based on email + password.
 
@@ -128,10 +140,13 @@ class UserLoginSerializer(EmailNormalization, serializers.Serializer):
     This prevents attackers from enumerating registered emails.
     """
 
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    email = serializers.EmailField(help_text='User email address')
+    password = serializers.CharField(
+        write_only=True, style={'input_type': 'password'}, help_text='User password'
+    )
 
     def validate_email(self, value):
+        """Normalize email to lowercase"""
         return self.normalize_email(value)
 
     def validate(self, attrs):
@@ -156,7 +171,7 @@ class UserLoginSerializer(EmailNormalization, serializers.Serializer):
         return attrs
 
 
-class PasswordResetRequestSerializer(EmailNormalization, serializers.Serializer):
+class PasswordResetRequestSerializer(EmailNormalizationBase, serializers.Serializer):
     """
     Accepts an email for initiating password reset.
 
@@ -166,14 +181,15 @@ class PasswordResetRequestSerializer(EmailNormalization, serializers.Serializer)
     API should always return success to prevent revealing registered emails.
     """
 
-    email = serializers.EmailField()
+    email = serializers.EmailField(help_text='Email address to send reset link')
 
     def validate_email(self, value):
+        """Normalize email to lowercase"""
         return self.normalize_email(value)
 
 
 class PasswordResetConfirmSerializer(
-    PasswordConfirmation, ResetTokenValidation, serializers.Serializer
+    PasswordConfirmationBase, ResetTokenValidationBase, serializers.Serializer
 ):
     """
     Validates reset token and allows setting a new password.
@@ -186,19 +202,27 @@ class PasswordResetConfirmSerializer(
     4. Return user for view to update password
     """
 
-    uid = serializers.CharField()
-    token = serializers.CharField()
+    uid = serializers.CharField(help_text='Base64 encoded user ID from reset email')
+    token = serializers.CharField(help_text='Password reset token from reset email')
     new_password = serializers.CharField(
         write_only=True,
         validators=[validate_password],
         style={'input_type': 'password'},
+        help_text='New password must meet strength requirements',
     )
     new_password_confirm = serializers.CharField(
-        write_only=True,
-        style={'input_type': 'password'},
+        write_only=True, style={'input_type': 'password'}, help_text='Must match new password'
     )
 
     def validate(self, attrs):
+        """
+        Validate password reset request
+
+        Steps:
+        1. Check password confirmation match
+        2. Validate UID and token
+        3. Return user for password update
+        """
         # Step 1: confirm new passwords match
         self.check_password_match(attrs['new_password'], attrs['new_password_confirm'])
 
@@ -208,22 +232,29 @@ class PasswordResetConfirmSerializer(
         return attrs
 
 
-class ChangePasswordSerializer(PasswordConfirmation, serializers.Serializer):
+class ChangePasswordSerializer(PasswordConfirmationBase, serializers.Serializer):
     """
     Allows already authenticated users to change their password.
 
     Validations:
     ------------
-    - Old password required
+    - Old password required and must be correct
     - New password must match confirmation
     - New password must NOT equal old password
     """
 
-    old_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    new_password = serializers.CharField(
-        write_only=True, validators=[validate_password], style={'input_type': 'password'}
+    old_password = serializers.CharField(
+        write_only=True, style={'input_type': 'password'}, help_text='Current password'
     )
-    new_password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    new_password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        style={'input_type': 'password'},
+        help_text='New password must meet strength requirements',
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True, style={'input_type': 'password'}, help_text='Must match new password'
+    )
 
     def validate_old_password(self, value):
         """
@@ -235,6 +266,7 @@ class ChangePasswordSerializer(PasswordConfirmation, serializers.Serializer):
         return value
 
     def validate(self, attrs):
+        """Validate password change request"""
         # Confirm new passwords match
         self.check_password_match(attrs['new_password'], attrs['new_password_confirm'])
 
@@ -247,11 +279,11 @@ class ChangePasswordSerializer(PasswordConfirmation, serializers.Serializer):
         return attrs
 
 
-class UserProfileSerializer(AuditReadOnlyFieldsMixin, serializers.ModelSerializer):
+class UserProfileSerializer(AuditFieldsBase, serializers.ModelSerializer):
     """
     Returns full user profile details.
 
-    All fields are read-only to avoid unintended data exposure.
+    All sensitive fields are read-only to avoid unintended data exposure.
     """
 
     full_name = serializers.CharField(read_only=True)
@@ -270,7 +302,7 @@ class UserProfileSerializer(AuditReadOnlyFieldsMixin, serializers.ModelSerialize
             'date_joined',
             'created_at',
         ]
-        read_only_fields = AuditReadOnlyFieldsMixin.audit_fields(
+        read_only_fields = audit_read_only_fields(
             'email',
             'username',
             'role',
@@ -278,3 +310,13 @@ class UserProfileSerializer(AuditReadOnlyFieldsMixin, serializers.ModelSerialize
             'date_joined',
             include_updated=False,
         )
+
+
+__all__ = [
+    'UserRegistrationSerializer',
+    'UserLoginSerializer',
+    'PasswordResetRequestSerializer',
+    'PasswordResetConfirmSerializer',
+    'ChangePasswordSerializer',
+    'UserProfileSerializer',
+]

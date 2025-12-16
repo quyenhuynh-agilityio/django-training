@@ -2,7 +2,6 @@
 Enrollment API Serializers
 
 Structure:
-- mixins.py       → shared serializer mixins
 - serializers.py  → core Enrollment serializers (read, write, create)
 """
 
@@ -11,9 +10,7 @@ from rest_framework import serializers
 
 from courses.api.serializers import CourseListSerializer
 from enrollments.models import Enrollment
-from utils.serializers import AuditReadOnlyFieldsMixin
-
-from .mixins import EnrollmentStudentInfoMixin
+from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
 # ───────────────────────────────────────────────────────────────
 # Base Serializer
@@ -21,8 +18,7 @@ from .mixins import EnrollmentStudentInfoMixin
 
 
 class EnrollmentBaseSerializer(
-    AuditReadOnlyFieldsMixin,
-    EnrollmentStudentInfoMixin,
+    AuditFieldsBase,
     serializers.ModelSerializer,
 ):
     """
@@ -45,7 +41,7 @@ class EnrollmentBaseSerializer(
             'created_at',
             'updated_at',
         ]
-        read_only_fields = AuditReadOnlyFieldsMixin.audit_fields('student')
+        read_only_fields = audit_read_only_fields('student')
 
 
 # ───────────────────────────────────────────────────────────────
