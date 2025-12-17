@@ -39,13 +39,13 @@ class Course(models.Model):
 
     # ─── Media Fields (Used in Mobile App & Web) ─────────────────
     image_url = models.URLField(
-        max_length=500,
+        max_length=1000,
         blank=True,
         help_text='Course thumbnail/cover image (e.g., Cloudinary, S3, YouTube thumbnail)',
     )
 
     video_url = models.URLField(
-        max_length=500,
+        max_length=700,
         blank=True,
         help_text='Intro/promo video (YouTube, Vimeo, direct MP4 link). Shown on course detail page.',
     )

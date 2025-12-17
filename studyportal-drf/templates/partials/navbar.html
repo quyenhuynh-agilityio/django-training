@@ -1,0 +1,61 @@
+<nav class="darken-2">
+    <div class="nav-wrapper container">
+        <a href="{% url 'course_list' %}" class="brand-logo">Study Portal</a>
+        <a href="#" data-target="mobile-nav" class="sidenav-trigger right"><i class="material-icons">menu</i></a>
+        <ul class="right hide-on-med-and-down">
+            {% if user.is_authenticated %}
+                <li>
+                    <a class="nav-item {% if request.resolver_match.url_name == 'course_list' %}active{% endif %}"
+                       href="{% url 'course_list' %}">All Courses</a>
+                </li>
+                <li>
+                    <a class="nav-item {% if request.resolver_match.url_name == 'enrolled_courses' %}active{% endif %}"
+                       href="{% url 'enrolled_courses' %}">My Courses</a>
+                </li>
+                <li>
+                    <span class="white-text nav-item">Hi, {{ user.username }}</span>
+                </li>
+                <li>
+                    <a class="nav-item" href="{% url 'logout' %}">Logout</a>
+                </li>
+            {% else %}
+                <li>
+                    <a class="nav-item {% if request.resolver_match.url_name == 'course_list' %}active{% endif %}"
+                       href="{% url 'course_list' %}">All Courses</a>
+                </li>
+                <li>
+                    <a class="nav-item {% if request.resolver_match.url_name == 'login' %}active{% endif %}"
+                       href="{% url 'login' %}">Login</a>
+                </li>
+            {% endif %}
+        </ul>
+    </div>
+</nav>
+<!-- Mobile Sidenav -->
+<ul class="sidenav" id="mobile-nav">
+    {% if user.is_authenticated %}
+        <li>
+            <a class="nav-item {% if request.resolver_match.url_name == 'course_list' %}active{% endif %}"
+               href="{% url 'course_list' %}">All Courses</a>
+        </li>
+        <li>
+            <a class="nav-item {% if request.resolver_match.url_name == 'enrolled_courses' %}active{% endif %}"
+               href="{% url 'enrolled_courses' %}">My Courses</a>
+        </li>
+        <li>
+            <div class="nav-item">Hi, {{ user.username }}</div>
+        </li>
+        <li>
+            <a class="nav-item" href="{% url 'logout' %}">Logout</a>
+        </li>
+    {% else %}
+        <li>
+            <a class="nav-item {% if request.resolver_match.url_name == 'course_list' %}active{% endif %}"
+               href="{% url 'course_list' %}">All Courses</a>
+        </li>
+        <li>
+            <a class="nav-item {% if request.resolver_match.url_name == 'login' %}active{% endif %}"
+               href="{% url 'login' %}">Login</a>
+        </li>
+    {% endif %}
+</ul>

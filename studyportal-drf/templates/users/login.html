@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}
+    Login
+{% endblock title %}
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/login.css' %}">
+{% endblock extra_css %}
+{% block content %}
+    <div class="login-container">
+        <h2 class="login-title">Login</h2>
+        <form method="post" class="login-form" novalidate>
+            {% csrf_token %}
+            <!-- Username -->
+            <div class="input-field">
+                {{ form.username }}
+                <label for="{{ form.username.id_for_label }}">Username</label>
+                {% if form.username.errors %}<span class="error">{{ form.username.errors.0 }}</span>{% endif %}
+            </div>
+            <!-- Password -->
+            <div class="input-field">
+                {{ form.password }}
+                <label for="{{ form.password.id_for_label }}">Password</label>
+                {% if form.password.errors %}<span class="error">{{ form.password.errors.0 }}</span>{% endif %}
+            </div>
+            <!-- Wrong credentials -->
+            {% if form.non_field_errors %}<span class="error">{{ form.non_field_errors.0 }}</span>{% endif %}
+            <button type="submit" class="btn btn-login waves-effect waves-light">Login</button>
+        </form>
+    </div>
+{% endblock content %}

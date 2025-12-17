@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}
+    Courses
+{% endblock title %}
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/course_list.css' %}">
+{% endblock extra_css %}
+{% block content %}
+    <!-- Search Row -->
+    <form method="get" class="search-box row">
+        <div class="col s12 m8">
+            <div class="input-field">
+                <input placeholder="Search Course..."
+                       id="search"
+                       type="text"
+                       name="q"
+                       value="{{ query }}">
+                <i class="material-icons prefix">search</i>
+            </div>
+        </div>
+        <!-- Preserve category when searching -->
+        {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
+    </form>
+    <!-- Categories Row -->
+    <div class="row categories-row">
+        <a href="?{% if query %}q={{ query }}&{% endif %}"
+           class="btn-category btn {% if not category %}btn-primary{% else %}btn-secondary{% endif %}">All</a>
+        {% for cat in categories %}
+            <a href="?q={{ query }}&category={{ cat.id }}"
+               class="btn-category btn {% if cat.id|stringformat:'s' == category %}btn-primary{% else %}btn-secondary{% endif %}">
+                {{ cat.name }}
+            </a>
+        {% endfor %}
+    </div>
+    <!-- Courses Grid -->
+    <div class="row">
+        {% for course in courses %}
+            <div class="col s12 m6 l4">
+                <div class="card equal-card hoverable">
+                    <!-- Course Image -->
+                    {% if course.image_url %}
+                        <img class="card-image"
+                             src="{{ course.image_url }}"
+                             alt="{{ course.title }}"
+                             width="400"
+                             height="200">
+                    {% endif %}
+                    <div class="card-content">
+                        <span class="card-title">{{ course.title }}</span>
+                        <p class="card-description">{{ course.description }}</p>
+                        <p class="card-category">
+                            Categories:
+                            {% if course.categories.all %}
+                                {% for cat in course.categories.all %}
+                                    {{ cat.name }}
+                                    {% if not forloop.last %},{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="card-action">
+                        {% if user.is_authenticated %}
+                            {% if course.id in enrolled_ids %}
+                                <button class="btn btn-secondary" disabled>Enrolled</button>
+                                {% if course.video_url %}
+                                    <a href="{{ course.video_url }}"
+                                       target="_blank"
+                                       class="btn btn-primary watch-btn">Watch Video</a>
+                                {% endif %}
+                            {% else %}
+                                <a href="{% url 'enroll_course' course.id %}" class="btn btn-primary">Enroll</a>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col s12">
+                <p>No courses available.</p>
+            </div>
+        {% endfor %}
+    </div>
+    <!-- Pagination (POST-based) -->
+    <div class="center-align pagination-wrapper">
+        {% if page_obj.has_previous %}
+            <a href="?q={{ query }}&category={{ category }}&page={{ page_obj.previous_page_number }}"
+               class="pagination-item">
+                <i class="material-icons pagination-icons left">chevron_left</i>
+            </a>
+        {% else %}
+            <span class="pagination-item disabled">
+                <i class="material-icons pagination-icons left">chevron_left</i>
+            </span>
+        {% endif %}
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a href="?q={{ query }}&category={{ category }}&page={{ page_obj.next_page_number }}"
+               class="pagination-item">
+                <i class="material-icons pagination-icons right">chevron_right</i>
+            </a>
+        {% else %}
+            <span class="pagination-item disabled">
+                <i class="material-icons pagination-icons right">chevron_right</i>
+            </span>
+        {% endif %}
+    </div>
+{% endblock content %}

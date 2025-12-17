@@ -1,0 +1,84 @@
+/* ================================
+   General body styles
+   ================================ */
+   html, body {
+    height: 100%;
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    display: flex;
+    flex-direction: column; /* Flex layout to push footer down */
+    min-height: 100vh;
+}
+
+/* Main content */
+main.content {
+    flex: 1 0 auto; /* grow, shrink, auto */
+    padding: 2rem 0;
+}
+
+/* ================================
+   Navbar
+   ================================ */
+nav {
+    padding: 0 20px;
+    background-color: #49BBBD;
+}
+
+.brand-logo {
+    font-weight: 600;
+    font-size: 2rem;
+}
+
+.nav-item {
+    font-weight: 500;
+    font-size: 18px;
+}
+
+.nav-item.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 0 10px;
+}
+
+/* Mobile hamburger menu button */
+.sidenav-trigger {
+    display: none !important;
+}
+
+@media only screen and (max-width: 992px) {
+    .sidenav-trigger {
+        display: block !important;
+    }
+
+    .brand-logo {
+        font-size: 1.5rem;
+    }
+}
+
+/* Mobile sidenav styling */
+.sidenav {
+    background-color: #49BBBD;
+}
+
+.sidenav li > a,
+.sidenav li > div {
+    color: #fff;
+    font-weight: 500;
+    font-size: 18px;
+    padding: 0 10px;
+}
+
+.sidenav li > a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ================================
+   Footer
+   ================================ */
+.page-footer {
+    padding: 20px 0;
+    font-size: 18px;
+    background-color: #49BBBD;
+}

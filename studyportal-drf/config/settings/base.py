@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'courses.apps.CoursesConfig',
     'categories.apps.CategoriesConfig',
     'enrollments.apps.EnrollmentsConfig',
+    'core',
 ]
 
 # ==============================

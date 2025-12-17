@@ -155,7 +155,7 @@ uv run python manage.py test
 
 ```
 studyportal-drf/
-├── accounts/       # Custom user model and authentication
+├── users/       # Custom user model and authentication
 ├── courses/        # Course management
 ├── categories/     # Course categories
 ├── enrollments/    # Student enrollments
