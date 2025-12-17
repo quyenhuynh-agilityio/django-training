@@ -282,6 +282,40 @@ class CourseAdmin(admin.ModelAdmin):
         )
 
     # ═══════════════════════════════════════════════════════════════════════════
+    #   F O R M   V A L I D A T I O N
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def save_model(self, request, obj, form, change):
+        """
+        Custom save with validation for business rules.
+
+        Validates:
+        - Cannot disable in-progress courses with enrolled students
+        - Status transitions follow proper workflow
+        """
+        if change:  # Only validate on update
+            # Get the original object from database
+            original = Course.objects.get(pk=obj.pk)
+
+            # Check if trying to disable in-progress course with students
+            if original.is_active and not obj.is_active:
+                enrolled_count = original.enrollments.filter(is_active=True).count()
+                if original.status == Course.STATUS_IN_PROGRESS and enrolled_count > 0:
+                    from django.contrib import messages
+
+                    messages.error(
+                        request,
+                        _(
+                            'Cannot disable this course. It is in progress with {count} enrolled student(s). '
+                            'Please change the course status first or wait for students to complete the course.'
+                        ).format(count=enrolled_count),
+                    )
+                    # Don't save the changes
+                    return
+
+        super().save_model(request, obj, form, change)
+
+    # ═══════════════════════════════════════════════════════════════════════════
     #   B U L K   A C T I O N S
     # ═══════════════════════════════════════════════════════════════════════════
 

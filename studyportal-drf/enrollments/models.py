@@ -1,3 +1,9 @@
+"""
+Enrollment Model
+
+Links students to courses with business rule validation.
+"""
+
 import uuid
 
 from django.conf import settings
@@ -39,6 +45,7 @@ class Enrollment(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     is_active = models.BooleanField(default=True, db_index=True)
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -63,21 +70,39 @@ class Enrollment(models.Model):
         return f'{self.student.email} to {self.course.title}'
 
     def clean(self):
+        """
+        Validate enrollment rules.
+
+        Only validates on NEW enrollments, not when updating existing ones
+        or when the course is being modified.
+        """
         # 1. Only students can enroll
         if self.student.role != 'student':
             raise ValidationError('Only students can be enrolled in courses.')
 
-        # 2. Course must be open for enrollment
-        if not self.course.can_enroll():
+        # 2. Only validate course enrollment rules for NEW enrollments
+        # Skip validation if this is an existing enrollment being updated
+        if not self.pk:  # Only for new enrollments
+            # Course must be active
             if not self.course.is_active:
                 raise ValidationError('This course is not active.')
+
+            # Course must have status='active' (not draft, in_progress, or completed)
             if self.course.status != Course.STATUS_ACTIVE:
-                raise ValidationError('This course is not open for enrollment.')
+                raise ValidationError(
+                    'This course is not open for enrollment. '
+                    'Only courses with "Active" status accept new enrollments.'
+                )
+
+            # Course must not be full
             if self.course.is_full:
                 raise ValidationError('This course has reached maximum capacity.')
 
     def save(self, *args, **kwargs):  # noqa: DJ012
-        self.full_clean()
+        # Only call full_clean on new instances to avoid validation issues
+        # when course status changes
+        if not self.pk:
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def unenroll(self):
@@ -88,3 +113,6 @@ class Enrollment(models.Model):
         self.is_active = False
         self.status = self.STATUS_DROPPED
         self.save(update_fields=['is_active', 'status', 'updated_at'])
+
+
+__all__ = ['Enrollment']

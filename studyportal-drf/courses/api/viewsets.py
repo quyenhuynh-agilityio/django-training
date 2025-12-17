@@ -281,7 +281,7 @@ class CourseViewSet(viewsets.ModelViewSet):
             course, 'enrolled_count_computed', course.enrollments.filter(is_active=True).count()
         )
 
-        if course.status == Course.STATUS_IN_PROGRESS and enrolled > 0:
+        if course.is_active and course.status == Course.STATUS_IN_PROGRESS and enrolled > 0:
             return Response(
                 {
                     'message': _(

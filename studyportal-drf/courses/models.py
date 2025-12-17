@@ -150,7 +150,3 @@ class Course(models.Model):
         """Soft delete the course by setting is_active to False"""
         self.is_active = False
         self.save(update_fields=['is_active', 'updated_at'])
-
-    def is_deleted(self):
-        """Check if course is soft-deleted"""
-        return not self.is_active

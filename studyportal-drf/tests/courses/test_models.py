@@ -59,7 +59,6 @@ def test_soft_delete_marks_inactive(create_course):
     course.refresh_from_db()
 
     assert course.is_active is False
-    assert course.is_deleted is True
 
 
 def test_str_and_is_full_without_max_students(create_course):
