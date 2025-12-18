@@ -48,6 +48,8 @@ def test_get_all_categories_cached(create_category):
     """Test that categories are cached"""
     # Clear cache first
     cache.clear()
+    create_category(name='Backend')
+    create_category(name='Frontend')
 
     # First call should hit database
     categories1 = get_all_categories()
@@ -285,6 +287,8 @@ def test_build_course_list_context_enrolled_view(create_user, create_course, cre
 def test_build_course_list_context_with_search(create_user, create_course):
     """Test build_course_list_context with search query"""
     user = create_user(email='user@example.com', username='user', role='student')
+    create_course(course_code='CRS024', title='Python Programming')
+    create_course(course_code='CRS025', title='Java Basics')
 
     factory = RequestFactory()
     request = factory.get('/courses/?q=Python')

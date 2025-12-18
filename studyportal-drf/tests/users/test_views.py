@@ -19,6 +19,8 @@ def test_user_login_view_get(client):
 
 def test_user_login_view_post_valid_credentials(client, create_user):
     """Test user login view POST with valid credentials"""
+    create_user(email='login@example.com', username='loginuser', password='StrongPass123')
+
     response = client.post(
         reverse('login'),
         {'username': 'login@example.com', 'password': 'StrongPass123'},

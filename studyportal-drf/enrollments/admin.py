@@ -156,8 +156,4 @@ class EnrollmentAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
-        """
-        Prevent deletion of enrollments.
-        Use soft delete (is_active=False) instead.
-        """
-        return False
+        return request.user.is_superuser
