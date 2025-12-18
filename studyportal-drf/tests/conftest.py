@@ -2,17 +2,12 @@ import uuid
 
 import pytest
 
-from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
-
-from categories.models import Category
-from courses.models import Course
-from enrollments.models import Enrollment
-
 
 @pytest.fixture
 def api_client():
     """DRF API client fixture."""
+    from rest_framework.test import APIClient
+
     return APIClient()
 
 
@@ -28,6 +23,8 @@ def create_user():
         password='StrongPass123',
         **extra,
     ):
+        from django.contrib.auth import get_user_model
+
         user_model = get_user_model()
         user = user_model.objects.create_user(
             email=email,
@@ -47,6 +44,8 @@ def create_category():
     """Factory to create categories."""
 
     def _create_category(name=None, **extra):
+        from categories.models import Category
+
         return Category.objects.create(name=name or f'Category-{uuid.uuid4().hex[:8]}', **extra)
 
     return _create_category
@@ -60,12 +59,16 @@ def create_course(create_user, create_category):
         title='Sample Course',
         course_code='CRS101',
         instructor=None,
-        status=Course.STATUS_ACTIVE,
+        status=None,
         is_active=True,
         max_students=None,
         categories=None,
         **extra,
     ):
+        from courses.models import Course
+
+        if status is None:
+            status = Course.STATUS_ACTIVE
         instructor = instructor or create_user(
             email=f'instructor-{uuid.uuid4().hex[:6]}@example.com',
             username=f'instructor-{uuid.uuid4().hex[:6]}',
@@ -92,6 +95,8 @@ def create_enrollment(create_user, create_course):
     """Factory to create enrollments."""
 
     def _create_enrollment(student=None, course=None, **extra):
+        from enrollments.models import Enrollment
+
         student = student or create_user(
             email=f'student-{uuid.uuid4().hex[:6]}@example.com',
             username=f'student-{uuid.uuid4().hex[:6]}',

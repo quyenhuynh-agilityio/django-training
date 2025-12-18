@@ -108,3 +108,52 @@ def test_prevent_enrollment_when_course_full(create_course, create_enrollment, c
 
     with pytest.raises(serializers.ValidationError, match='maximum capacity'):
         serializer.is_valid(raise_exception=True)
+
+
+def test_enrollment_create_race_condition_handling(create_course, create_user):
+    """Test that enrollment creation handles race conditions with locking"""
+    course = create_course(max_students=1, status=Course.STATUS_ACTIVE, is_active=True)
+    student = create_user(email='student@example.com', username='student', role='student')
+    request = _build_request(student)
+
+    serializer = EnrollmentCreateSerializer(
+        data={'course_id': str(course.id)}, context={'request': request}
+    )
+    assert serializer.is_valid(), serializer.errors
+    enrollment = serializer.save()
+    assert enrollment is not None
+    assert enrollment.student == student
+    assert enrollment.course == course
+
+
+def test_enrollment_create_already_enrolled(create_course, create_user, create_enrollment):
+    """Test that creating enrollment when already enrolled raises error"""
+    course = create_course(status=Course.STATUS_ACTIVE, is_active=True)
+    student = create_user(email='student@example.com', username='student', role='student')
+    create_enrollment(student=student, course=course)
+    request = _build_request(student)
+
+    serializer = EnrollmentCreateSerializer(
+        data={'course_id': str(course.id)}, context={'request': request}
+    )
+    assert serializer.is_valid() is False
+    assert 'course_id' in serializer.errors
+
+
+def test_enrollment_create_to_representation(create_course, create_user):
+    """Test that to_representation returns full enrollment data"""
+
+    course = create_course(status=Course.STATUS_ACTIVE, is_active=True)
+    student = create_user(email='student@example.com', username='student', role='student')
+    request = _build_request(student)
+
+    serializer = EnrollmentCreateSerializer(
+        data={'course_id': str(course.id)}, context={'request': request}
+    )
+    assert serializer.is_valid(), serializer.errors
+    enrollment = serializer.save()
+
+    # Test to_representation
+    representation = serializer.to_representation(enrollment)
+    assert 'course' in representation
+    assert representation['course']['id'] == str(course.id)

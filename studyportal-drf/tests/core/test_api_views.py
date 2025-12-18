@@ -47,3 +47,12 @@ def test_bad_request_shapes_error_payload():
     assert response.status_code == 400
     assert response.data['errors']['message'] == ['Invalid state']
     assert response.data['errors']['code'] == 'INVALID_STATE'
+
+
+def test_server_error_response():
+    response = CommonViewSet().server_error(message='Database connection failed', code='DB_ERROR')
+
+    assert response.status_code == 500
+    assert response.data['errors']['message'] == ['Database connection failed']
+    assert response.data['errors']['code'] == 'DB_ERROR'
+    assert 'developerMessage' in response.data['errors']

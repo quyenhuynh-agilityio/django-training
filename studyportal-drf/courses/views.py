@@ -28,7 +28,7 @@ def enroll_course(request, course_id):
     course = get_object_or_404(Course, id=course_id, is_active=True)
 
     Enrollment.objects.get_or_create(
-        user=request.user,
+        student=request.user,
         course=course,
         defaults={'is_active': True},
     )

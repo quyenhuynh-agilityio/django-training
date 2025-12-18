@@ -82,7 +82,8 @@ class Enrollment(models.Model):
 
         # 2. Only validate course enrollment rules for NEW enrollments
         # Skip validation if this is an existing enrollment being updated
-        if not self.pk:  # Only for new enrollments
+        # Use _state.adding instead of checking pk, as UUID pk is set before save()
+        if self._state.adding:  # Only for new enrollments
             # Course must be active
             if not self.course.is_active:
                 raise ValidationError('This course is not active.')
@@ -101,7 +102,8 @@ class Enrollment(models.Model):
     def save(self, *args, **kwargs):  # noqa: DJ012
         # Only call full_clean on new instances to avoid validation issues
         # when course status changes
-        if not self.pk:
+        # Use _state.adding instead of checking pk, as UUID pk is set before save()
+        if self._state.adding:
             self.full_clean()
         super().save(*args, **kwargs)
 

@@ -80,7 +80,7 @@ def test_registration_serializer_requires_matching_passwords():
     )
 
     assert serializer.is_valid() is False
-    assert 'password' in serializer.errors
+    assert 'password_confirm' in serializer.errors
 
 
 def test_login_serializer_validates_credentials(create_user):
@@ -138,13 +138,24 @@ def test_password_reset_confirm_serializer_accepts_valid_token(create_user):
     assert serializer.validated_data['user'] == user
 
 
-def test_change_password_serializer_rejects_same_password():
+def test_change_password_serializer_rejects_same_password(api_client, create_user):
+    user = create_user(email='changepw@example.com', username='changepw', password='SamePass123')
+    api_client.force_authenticate(user=user)
+
+    # Create a mock request object with user
+    from rest_framework.test import APIRequestFactory
+
+    factory = APIRequestFactory()
+    request = factory.post('/')
+    request.user = user
+
     serializer = ChangePasswordSerializer(
         data={
             'old_password': 'SamePass123',
             'new_password': 'SamePass123',
             'new_password_confirm': 'SamePass123',
-        }
+        },
+        context={'request': request},
     )
 
     assert serializer.is_valid() is False

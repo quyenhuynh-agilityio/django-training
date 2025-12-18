@@ -85,9 +85,14 @@ def test_validate_max_students_positive_number():
 def test_prevent_disabling_in_progress_with_enrollments(
     create_course, create_enrollment, create_user
 ):
-    course = create_course(status=Course.STATUS_IN_PROGRESS, is_active=True)
+    # Create course in ACTIVE status first (required for enrollment)
+    course = create_course(status=Course.STATUS_ACTIVE, is_active=True)
     student = create_user(email='enrolled@example.com', username='enrolled', role='student')
+    # Create enrollment while course is active
     create_enrollment(student=student, course=course)
+    # Change course to IN_PROGRESS status (simulating course starting)
+    course.status = Course.STATUS_IN_PROGRESS
+    course.save()
 
     serializer = CourseCreateUpdateSerializer(
         instance=course,
@@ -107,3 +112,131 @@ def test_course_detail_serializer_category_names(create_category, create_course)
     serializer = CourseDetailSerializer(course)
 
     assert serializer.data['category_names'] == 'API, Backend'
+
+
+def test_course_code_empty_validation():
+    """Test that empty course code is rejected"""
+    serializer = CourseCreateUpdateSerializer(data={'title': 'Test Course', 'course_code': '   '})
+    assert serializer.is_valid() is False
+    assert 'course_code' in serializer.errors
+
+
+def test_course_code_invalid_format():
+    """Test that invalid course code format is rejected"""
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test Course', 'course_code': 'INVALID@CODE!'}
+    )
+    assert serializer.is_valid() is False
+    assert 'course_code' in serializer.errors
+
+
+def test_course_code_uppercase_normalization(create_user):
+    """Test that course code is normalized to uppercase"""
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test Course', 'course_code': 'lower123'}
+    )
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data['course_code'] == 'LOWER123'
+
+
+def test_validate_max_students_null_allowed():
+    """Test that max_students can be null"""
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Unlimited Course', 'course_code': 'UNL100', 'max_students': None}
+    )
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data['max_students'] is None
+
+
+def test_validate_max_students_negative():
+    """Test that negative max_students is rejected"""
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Bad Course', 'course_code': 'BAD100', 'max_students': -1}
+    )
+    assert serializer.is_valid() is False
+    assert 'max_students' in serializer.errors
+
+
+def test_validate_status_invalid():
+    """Test that invalid status is rejected"""
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test Course', 'course_code': 'TST100', 'status': 'invalid_status'}
+    )
+    assert serializer.is_valid() is False
+    assert 'status' in serializer.errors
+
+
+def test_validate_video_url_invalid():
+    """Test that invalid video URL format is rejected"""
+    serializer = CourseCreateUpdateSerializer(
+        data={
+            'title': 'Test Course',
+            'course_code': 'TST100',
+            'video_url': 'not-a-valid-url',
+        }
+    )
+    assert serializer.is_valid() is False
+    assert 'video_url' in serializer.errors
+
+
+def test_validate_video_url_valid():
+    """Test that valid video URL is accepted"""
+    serializer = CourseCreateUpdateSerializer(
+        data={
+            'title': 'Test Course',
+            'course_code': 'TST100',
+            'video_url': 'https://www.youtube.com/watch?v=test',
+        }
+    )
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data['video_url'] == 'https://www.youtube.com/watch?v=test'
+
+
+def test_validate_image_url_invalid():
+    """Test that invalid image URL format is rejected"""
+    serializer = CourseCreateUpdateSerializer(
+        data={
+            'title': 'Test Course',
+            'course_code': 'TST100',
+            'image_url': 'not-a-valid-url',
+        }
+    )
+    assert serializer.is_valid() is False
+    assert 'image_url' in serializer.errors
+
+
+def test_validate_image_url_valid():
+    """Test that valid image URL is accepted"""
+    serializer = CourseCreateUpdateSerializer(
+        data={
+            'title': 'Test Course',
+            'course_code': 'TST100',
+            'image_url': 'https://example.com/image.jpg',
+        }
+    )
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data['image_url'] == 'https://example.com/image.jpg'
+
+
+def test_validate_category_ids_empty_list():
+    """Test that empty category_ids list is allowed"""
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test Course', 'course_code': 'TST100', 'category_ids': []}
+    )
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data['category_ids'] == []
+
+
+def test_validate_category_ids_duplicates_removed(create_category):
+    """Test that duplicate category IDs are removed"""
+    category = create_category(name='Test')
+    serializer = CourseCreateUpdateSerializer(
+        data={
+            'title': 'Test Course',
+            'course_code': 'TST100',
+            'category_ids': [category.id, category.id, category.id],
+        }
+    )
+    assert serializer.is_valid(), serializer.errors
+    # Should have only one unique ID
+    assert len(serializer.validated_data['category_ids']) == 1
