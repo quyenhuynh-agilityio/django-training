@@ -983,4 +983,4 @@ The system is ready for mobile app integration and can be extended with addition
 
 **Project Author**: Quyen Huynh
 **Email**: quyen.huynh@asnet.com.vn
-**Date**: 2024
+**Date**: 2025
