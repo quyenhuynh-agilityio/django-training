@@ -15,7 +15,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from core.texts import ErrorMessage, HelpText
-from utils.serializers import AuditFieldsBase, audit_read_only_fields
+from utils.serializers import AuditFieldsBase, CamelCaseSerializerMixin, audit_read_only_fields
 
 from .bases import (
     EmailNormalizationBase,
@@ -28,6 +28,7 @@ User = get_user_model()
 
 
 class UserRegistrationSerializer(
+    CamelCaseSerializerMixin,
     EmailNormalizationBase,
     NameValidationBase,
     PasswordConfirmationBase,
@@ -131,7 +132,7 @@ class UserRegistrationSerializer(
         return User.objects.create_user(role='student', **validated_data)
 
 
-class UserLoginSerializer(EmailNormalizationBase, serializers.Serializer):
+class UserLoginSerializer(CamelCaseSerializerMixin, EmailNormalizationBase, serializers.Serializer):
     """
     Authenticates user based on email + password.
 
@@ -172,7 +173,11 @@ class UserLoginSerializer(EmailNormalizationBase, serializers.Serializer):
         return attrs
 
 
-class PasswordResetRequestSerializer(EmailNormalizationBase, serializers.Serializer):
+class PasswordResetRequestSerializer(
+    CamelCaseSerializerMixin,
+    EmailNormalizationBase,
+    serializers.Serializer,
+):
     """
     Accepts an email for initiating password reset.
 
@@ -190,7 +195,10 @@ class PasswordResetRequestSerializer(EmailNormalizationBase, serializers.Seriali
 
 
 class PasswordResetConfirmSerializer(
-    PasswordConfirmationBase, ResetTokenValidationBase, serializers.Serializer
+    CamelCaseSerializerMixin,
+    PasswordConfirmationBase,
+    ResetTokenValidationBase,
+    serializers.Serializer,
 ):
     """
     Validates reset token and allows setting a new password.
@@ -235,7 +243,9 @@ class PasswordResetConfirmSerializer(
         return attrs
 
 
-class ChangePasswordSerializer(PasswordConfirmationBase, serializers.Serializer):
+class ChangePasswordSerializer(
+    CamelCaseSerializerMixin, PasswordConfirmationBase, serializers.Serializer
+):
     """
     Allows already authenticated users to change their password.
 
@@ -284,7 +294,7 @@ class ChangePasswordSerializer(PasswordConfirmationBase, serializers.Serializer)
         return attrs
 
 
-class UserProfileSerializer(AuditFieldsBase, serializers.ModelSerializer):
+class UserProfileSerializer(CamelCaseSerializerMixin, AuditFieldsBase, serializers.ModelSerializer):
     """
     Returns full user profile details.
 

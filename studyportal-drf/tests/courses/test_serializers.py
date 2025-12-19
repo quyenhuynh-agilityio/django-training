@@ -111,7 +111,7 @@ def test_course_detail_serializer_category_names(create_category, create_course)
 
     serializer = CourseDetailSerializer(course)
 
-    assert serializer.data['category_names'] == 'API, Backend'
+    assert serializer.data['categoryNames'] == 'API, Backend'
 
 
 def test_course_code_empty_validation():

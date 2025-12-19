@@ -8,9 +8,10 @@ from rest_framework import serializers
 
 from categories.models import Category
 from core.texts import ErrorMessage
+from utils.serializers import CamelCaseSerializerMixin
 
 
-class CategorySerializer(serializers.ModelSerializer):
+class CategorySerializer(CamelCaseSerializerMixin, serializers.ModelSerializer):
     """
     Category Serializer
 

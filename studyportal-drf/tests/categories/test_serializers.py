@@ -12,8 +12,8 @@ def test_category_serializer_outputs_expected_fields(create_category):
 
     assert data['id'] == str(category.id)
     assert data['name'] == 'Backend'
-    assert data['is_active'] is True
-    assert 'created_at' in data and 'updated_at' in data
+    assert data['isActive'] is True
+    assert 'createdAt' in data and 'updatedAt' in data
 
 
 def test_category_serializer_rejects_empty_name():
