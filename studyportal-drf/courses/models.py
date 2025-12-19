@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from core.texts import ErrorMessage, HelpText
+
 
 class Course(models.Model):
     """
@@ -26,28 +28,26 @@ class Course(models.Model):
     # ─── Primary Key & Basic Info ───────────────────────────────
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    title = models.CharField(max_length=255, help_text='Public course title')
+    title = models.CharField(max_length=255, help_text=HelpText.COURSE_TITLE)
     course_code = models.CharField(
         max_length=20,
         db_index=True,
         unique=True,
-        help_text='Human-readable unique code: PY101, WEB202, etc.',
+        help_text=HelpText.COURSE_CODE,
     )
-    description = models.TextField(
-        blank=True, help_text='Full course description (supports Markdown)'
-    )
+    description = models.TextField(blank=True, help_text=HelpText.COURSE_DESCRIPTION)
 
     # ─── Media Fields (Used in Mobile App & Web) ─────────────────
     image_url = models.URLField(
         max_length=1000,
         blank=True,
-        help_text='Course thumbnail/cover image (e.g., Cloudinary, S3, YouTube thumbnail)',
+        help_text=HelpText.COURSE_IMAGE_URL,
     )
 
     video_url = models.URLField(
         max_length=700,
         blank=True,
-        help_text='Intro/promo video (YouTube, Vimeo, direct MP4 link). Shown on course detail page.',
+        help_text=HelpText.COURSE_VIDEO_URL,
     )
 
     # ─── Relationships ──────────────────────────────────────────
@@ -55,7 +55,7 @@ class Course(models.Model):
         'categories.Category',
         related_name='courses',
         blank=True,
-        help_text='Used for filtering in mobile app and course list',
+        help_text=HelpText.COURSE_CATEGORIES,
     )
 
     instructor = models.ForeignKey(
@@ -64,7 +64,7 @@ class Course(models.Model):
         null=True,
         related_name='taught_courses',
         limit_choices_to={'role': 'instructor'},
-        help_text='Instructor who owns this course',
+        help_text=HelpText.COURSE_INSTRUCTOR,
     )
 
     # ─── Status & Enrollment Control ────────────────────────────
@@ -73,17 +73,17 @@ class Course(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_DRAFT,
         db_index=True,
-        help_text='Controls visibility and enrollment rules',
+        help_text=HelpText.COURSE_STATUS,
     )
 
     is_active = models.BooleanField(
         default=True,
         db_index=True,
-        help_text='Quick toggle to show/hide course. Set to False for soft delete.',
+        help_text=HelpText.COURSE_IS_ACTIVE,
     )
 
     max_students = models.PositiveIntegerField(
-        null=True, blank=True, help_text='Maximum enrollment limit. Leave empty for unlimited.'
+        null=True, blank=True, help_text=HelpText.COURSE_MAX_STUDENTS
     )
 
     # ─── Timestamps ─────────────────────────────────────────────
@@ -125,9 +125,7 @@ class Course(models.Model):
     def clean(self):
         # Only real instructors can be assigned
         if self.instructor and self.instructor.role != 'instructor':
-            raise ValidationError(
-                {'instructor': 'Only users with Instructor role can teach courses.'}
-            )
+            raise ValidationError({'instructor': ErrorMessage.ONLY_INSTRUCTORS_CAN_TEACH})
 
         # Prevent disabling in-progress course with students
         if self.pk:
@@ -138,9 +136,7 @@ class Course(models.Model):
 
             if old and old.is_active and not self.is_active:
                 if old.status == self.STATUS_IN_PROGRESS and self._enrolled_count > 0:
-                    raise ValidationError(
-                        'Cannot disable a course that is in progress with enrolled students.'
-                    )
+                    raise ValidationError(ErrorMessage.CANNOT_DISABLE_IN_PROGRESS_WITH_STUDENTS)
 
     def save(self, *args, **kwargs):  # noqa: DJ012
         self.full_clean()

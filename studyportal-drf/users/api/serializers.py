@@ -14,6 +14,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from core.texts import ErrorMessage, HelpText
 from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
 from .bases import (
@@ -48,22 +49,24 @@ class UserRegistrationSerializer(
         write_only=True,
         validators=[validate_password],
         style={'input_type': 'password'},
-        help_text='Password must meet strength requirements',
+        help_text=HelpText.PASSWORD_STRENGTH_REQUIREMENTS,
     )
     password_confirm = serializers.CharField(
-        write_only=True, style={'input_type': 'password'}, help_text='Must match password'
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text=HelpText.MUST_MATCH_PASSWORD,
     )
 
     # Use DRF's built-in UniqueValidator to avoid race conditions
     email = serializers.EmailField(
         validators=[UniqueValidator(queryset=User.objects.all())],
         required=True,
-        help_text='Must be unique',
+        help_text=HelpText.EMAIL_MUST_BE_UNIQUE,
     )
     username = serializers.CharField(
         validators=[UniqueValidator(queryset=User.objects.all())],
         required=True,
-        help_text='Must be unique, alphanumeric with underscores',
+        help_text=HelpText.USERNAME_UNIQUE_AND_FORMAT,
     )
 
     class Meta:
@@ -93,9 +96,7 @@ class UserRegistrationSerializer(
         """Validate username format"""
         value = value.strip()
         if not value.replace('_', '').isalnum():
-            raise serializers.ValidationError(
-                'Username may contain letters, numbers, and underscores only.'
-            )
+            raise serializers.ValidationError(ErrorMessage.USERNAME_INVALID_CHARS)
         return value
 
     def validate_first_name(self, value):
@@ -140,9 +141,9 @@ class UserLoginSerializer(EmailNormalizationBase, serializers.Serializer):
     This prevents attackers from enumerating registered emails.
     """
 
-    email = serializers.EmailField(help_text='User email address')
+    email = serializers.EmailField(help_text=HelpText.USER_EMAIL_ADDRESS)
     password = serializers.CharField(
-        write_only=True, style={'input_type': 'password'}, help_text='User password'
+        write_only=True, style={'input_type': 'password'}, help_text=HelpText.USER_PASSWORD
     )
 
     def validate_email(self, value):
@@ -162,10 +163,10 @@ class UserLoginSerializer(EmailNormalizationBase, serializers.Serializer):
         user = User.objects.filter(email=email).first()
 
         if not user or not user.check_password(password):
-            raise serializers.ValidationError({'detail': 'Invalid email or password.'})
+            raise serializers.ValidationError({'detail': ErrorMessage.INVALID_EMAIL_OR_PASSWORD})
 
         if not user.is_active:
-            raise serializers.ValidationError({'detail': 'User account is disabled.'})
+            raise serializers.ValidationError({'detail': ErrorMessage.USER_ACCOUNT_DISABLED})
 
         attrs['user'] = user
         return attrs
@@ -181,7 +182,7 @@ class PasswordResetRequestSerializer(EmailNormalizationBase, serializers.Seriali
     API should always return success to prevent revealing registered emails.
     """
 
-    email = serializers.EmailField(help_text='Email address to send reset link')
+    email = serializers.EmailField(help_text=HelpText.PASSWORD_RESET_EMAIL)
 
     def validate_email(self, value):
         """Normalize email to lowercase"""
@@ -202,16 +203,18 @@ class PasswordResetConfirmSerializer(
     4. Return user for view to update password
     """
 
-    uid = serializers.CharField(help_text='Base64 encoded user ID from reset email')
-    token = serializers.CharField(help_text='Password reset token from reset email')
+    uid = serializers.CharField(help_text=HelpText.RESET_UID)
+    token = serializers.CharField(help_text=HelpText.RESET_TOKEN)
     new_password = serializers.CharField(
         write_only=True,
         validators=[validate_password],
         style={'input_type': 'password'},
-        help_text='New password must meet strength requirements',
+        help_text=HelpText.PASSWORD_STRENGTH_REQUIREMENTS,
     )
     new_password_confirm = serializers.CharField(
-        write_only=True, style={'input_type': 'password'}, help_text='Must match new password'
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text=HelpText.MUST_MATCH_PASSWORD,
     )
 
     def validate(self, attrs):
@@ -244,16 +247,18 @@ class ChangePasswordSerializer(PasswordConfirmationBase, serializers.Serializer)
     """
 
     old_password = serializers.CharField(
-        write_only=True, style={'input_type': 'password'}, help_text='Current password'
+        write_only=True, style={'input_type': 'password'}, help_text=HelpText.CURRENT_PASSWORD
     )
     new_password = serializers.CharField(
         write_only=True,
         validators=[validate_password],
         style={'input_type': 'password'},
-        help_text='New password must meet strength requirements',
+        help_text=HelpText.PASSWORD_STRENGTH_REQUIREMENTS,
     )
     new_password_confirm = serializers.CharField(
-        write_only=True, style={'input_type': 'password'}, help_text='Must match new password'
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text=HelpText.MUST_MATCH_PASSWORD,
     )
 
     def validate_old_password(self, value):
@@ -262,7 +267,7 @@ class ChangePasswordSerializer(PasswordConfirmationBase, serializers.Serializer)
         """
         user = self.context['request'].user
         if not user.check_password(value):
-            raise serializers.ValidationError('Old password is incorrect.')
+            raise serializers.ValidationError(ErrorMessage.OLD_PASSWORD_INCORRECT)
         return value
 
     def validate(self, attrs):
@@ -273,7 +278,7 @@ class ChangePasswordSerializer(PasswordConfirmationBase, serializers.Serializer)
         # New password must be different from old
         if attrs['old_password'] == attrs['new_password']:
             raise serializers.ValidationError(
-                {'new_password': 'New password must be different from the old password.'}
+                {'new_password': ErrorMessage.NEW_PASSWORD_MUST_DIFFER}
             )
 
         return attrs

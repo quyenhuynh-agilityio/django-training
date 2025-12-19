@@ -3,6 +3,8 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from core.texts import HelpText
+
 
 class User(AbstractUser):
     """
@@ -27,14 +29,14 @@ class User(AbstractUser):
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
-        help_text='Secure, unguessable ID used in APIs and mobile app',
+        help_text=HelpText.USER_ID,
     )
 
     email = models.EmailField(
         unique=True,
         blank=False,
         db_index=True,  # Critical: login queries use email
-        help_text='Used as login identifier (not username)',
+        help_text=HelpText.USER_EMAIL_LOGIN,
     )
 
     role = models.CharField(
@@ -42,7 +44,7 @@ class User(AbstractUser):
         choices=ROLE_CHOICES,
         default=ROLE_STUDENT,
         db_index=True,  # Fast filtering: all instructors, all students
-        help_text='Determines user permissions in the platform',
+        help_text=HelpText.USER_ROLE,
     )
 
     # Keep these for Django admin compatibility + full name display
@@ -50,8 +52,8 @@ class User(AbstractUser):
     last_name = models.CharField(max_length=150, blank=True)
 
     # ─── Timestamps ─────────────────────────────────────────────
-    created_at = models.DateTimeField(auto_now_add=True, help_text='When user registered')
-    updated_at = models.DateTimeField(auto_now=True, help_text='Last profile update')
+    created_at = models.DateTimeField(auto_now_add=True, help_text=HelpText.USER_CREATED_AT)
+    updated_at = models.DateTimeField(auto_now=True, help_text=HelpText.USER_UPDATED_AT)
 
     # ─── Authentication Settings ────────────────────────────────
     USERNAME_FIELD = 'email'  # Login with email, not username

@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from core.texts import ErrorMessage, HelpText
 from courses.models import Course
 
 
@@ -36,7 +37,7 @@ class Enrollment(models.Model):
         on_delete=models.CASCADE,
         related_name='enrollments',
         limit_choices_to={'role': 'student'},
-        help_text='Only student-role users can be enrolled',
+        help_text=HelpText.ENROLLMENT_STUDENT_FK,
     )
 
     course = models.ForeignKey(
@@ -78,7 +79,7 @@ class Enrollment(models.Model):
         """
         # 1. Only students can enroll
         if self.student.role != 'student':
-            raise ValidationError('Only students can be enrolled in courses.')
+            raise ValidationError(ErrorMessage.ONLY_STUDENTS_CAN_BE_ENROLLED)
 
         # 2. Only validate course enrollment rules for NEW enrollments
         # Skip validation if this is an existing enrollment being updated
@@ -86,18 +87,15 @@ class Enrollment(models.Model):
         if self._state.adding:  # Only for new enrollments
             # Course must be active
             if not self.course.is_active:
-                raise ValidationError('This course is not active.')
+                raise ValidationError(ErrorMessage.COURSE_NOT_ACTIVE)
 
             # Course must have status='active' (not draft, in_progress, or completed)
             if self.course.status != Course.STATUS_ACTIVE:
-                raise ValidationError(
-                    'This course is not open for enrollment. '
-                    'Only courses with "Active" status accept new enrollments.'
-                )
+                raise ValidationError(ErrorMessage.COURSE_NOT_OPEN_FOR_ENROLLMENT)
 
             # Course must not be full
             if self.course.is_full:
-                raise ValidationError('This course has reached maximum capacity.')
+                raise ValidationError(ErrorMessage.COURSE_REACHED_MAX_CAPACITY)
 
     def save(self, *args, **kwargs):  # noqa: DJ012
         # Only call full_clean on new instances to avoid validation issues

@@ -11,6 +11,8 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 
+from core.texts import ErrorMessage
+
 User = get_user_model()
 
 
@@ -116,7 +118,9 @@ class PasswordConfirmationBase(serializers.Serializer):
             ValidationError: If passwords don't match
         """
         if password != password_confirm:
-            raise serializers.ValidationError({'password_confirm': 'Passwords do not match.'})
+            raise serializers.ValidationError(
+                {'password_confirm': ErrorMessage.PASSWORDS_DO_NOT_MATCH}
+            )
 
 
 class ResetTokenValidationBase(serializers.Serializer):
@@ -155,15 +159,17 @@ class ResetTokenValidationBase(serializers.Serializer):
             uid_decoded = force_str(urlsafe_base64_decode(uid))
             user = User.objects.get(pk=uid_decoded)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            raise serializers.ValidationError({'uid': 'Invalid reset link.'})  # noqa: B904
+            raise serializers.ValidationError({'uid': ErrorMessage.INVALID_RESET_LINK})  # noqa: B904
 
         # Validate token
         if not default_token_generator.check_token(user, token):
-            raise serializers.ValidationError({'token': 'Invalid or expired reset token.'})
+            raise serializers.ValidationError(
+                {'token': ErrorMessage.INVALID_OR_EXPIRED_RESET_TOKEN}
+            )
 
         # Check if user is active
         if not user.is_active:
-            raise serializers.ValidationError({'detail': 'User account is disabled.'})
+            raise serializers.ValidationError({'detail': ErrorMessage.USER_ACCOUNT_DISABLED})
 
         return user
 

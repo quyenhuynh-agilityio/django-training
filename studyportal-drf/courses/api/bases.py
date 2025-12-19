@@ -7,6 +7,8 @@ These are NOT DRF mixins - they're standard Python base classes.
 
 from rest_framework import serializers
 
+from core.texts import HelpText
+
 
 class CourseEnrollmentFieldsBase(serializers.Serializer):
     """
@@ -22,15 +24,9 @@ class CourseEnrollmentFieldsBase(serializers.Serializer):
                 fields = [..., 'enrolled_count', 'is_full', 'can_enroll']
     """
 
-    enrolled_count = serializers.SerializerMethodField(
-        help_text='Current number of active enrollments'
-    )
-    is_full = serializers.SerializerMethodField(
-        help_text='Whether the course has reached maximum capacity'
-    )
-    can_enroll = serializers.SerializerMethodField(
-        help_text='Whether new students can currently enroll'
-    )
+    enrolled_count = serializers.SerializerMethodField(help_text=HelpText.ENROLLED_COUNT)
+    is_full = serializers.SerializerMethodField(help_text=HelpText.COURSE_IS_FULL)
+    can_enroll = serializers.SerializerMethodField(help_text=HelpText.COURSE_CAN_ENROLL)
 
     def get_enrolled_count(self, obj):
         """Get enrolled count from annotation or model property"""
@@ -56,9 +52,7 @@ class CategoryNamesFieldBase(serializers.Serializer):
                 fields = [..., 'category_names']
     """
 
-    category_names = serializers.SerializerMethodField(
-        help_text='Comma-separated list of category names'
-    )
+    category_names = serializers.SerializerMethodField(help_text=HelpText.COURSE_CATEGORY_NAMES)
 
     def get_category_names(self, obj):
         """Return comma-separated category names"""

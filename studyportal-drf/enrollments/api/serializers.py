@@ -8,6 +8,7 @@ Structure:
 from django.db import transaction
 from rest_framework import serializers
 
+from core.texts import ErrorMessage, HelpText
 from courses.api.serializers import CourseListSerializer
 from enrollments.models import Enrollment
 from utils.serializers import AuditFieldsBase, audit_read_only_fields
@@ -86,7 +87,7 @@ class EnrollmentCreateSerializer(serializers.Serializer):
 
     course_id = serializers.UUIDField(
         write_only=True,
-        help_text='UUID of the course to enroll in',
+        help_text=HelpText.ENROLL_COURSE_ID,
     )
 
     def validate_course_id(self, value):
@@ -96,7 +97,7 @@ class EnrollmentCreateSerializer(serializers.Serializer):
         try:
             course = Course.objects.get(id=value)
         except Course.DoesNotExist:
-            raise serializers.ValidationError('Course not found.')  # noqa: B904
+            raise serializers.ValidationError(ErrorMessage.COURSE_NOT_FOUND)  # noqa: B904
 
         return course  # Return the course object for reuse
 
@@ -110,22 +111,19 @@ class EnrollmentCreateSerializer(serializers.Serializer):
         if not course.can_enroll():
             if not course.is_active:
                 raise serializers.ValidationError(
-                    {'course_id': 'Cannot enroll in an inactive course.'}
+                    {'course_id': ErrorMessage.CANNOT_ENROLL_IN_INACTIVE_COURSE}
                 )
 
             if course.status != 'active':
                 raise serializers.ValidationError(
                     {
-                        'course_id': (
-                            f'Cannot enroll in a course that is {course.get_status_display().lower()}.'
-                        )
+                        'course_id': ErrorMessage.CANNOT_ENROLL_WHEN_NOT_OPEN_TEMPLATE
+                        % {'status': course.get_status_display().lower()}
                     }
                 )
 
             if course.is_full:
-                raise serializers.ValidationError(
-                    {'course_id': 'Course has reached maximum capacity.'}
-                )
+                raise serializers.ValidationError({'course_id': ErrorMessage.COURSE_AT_CAPACITY})
 
         # --- Duplicate enrollment ---------------------------------------------
         if Enrollment.objects.filter(
@@ -133,9 +131,7 @@ class EnrollmentCreateSerializer(serializers.Serializer):
             course=course,
             is_active=True,
         ).exists():
-            raise serializers.ValidationError(
-                {'course_id': 'You are already enrolled in this course.'}
-            )
+            raise serializers.ValidationError({'course_id': ErrorMessage.ALREADY_ENROLLED})
 
         # Store for create method
         attrs['course'] = course
@@ -154,7 +150,7 @@ class EnrollmentCreateSerializer(serializers.Serializer):
             # Re-check constraints under DB lock
             if not locked_course.can_enroll():
                 raise serializers.ValidationError(
-                    {'course_id': 'Cannot enroll in this course at the moment.'}
+                    {'course_id': ErrorMessage.CANNOT_ENROLL_AT_THE_MOMENT}
                 )
 
             if Enrollment.objects.filter(
@@ -162,9 +158,7 @@ class EnrollmentCreateSerializer(serializers.Serializer):
                 course=locked_course,
                 is_active=True,
             ).exists():
-                raise serializers.ValidationError(
-                    {'course_id': 'You are already enrolled in this course.'}
-                )
+                raise serializers.ValidationError({'course_id': ErrorMessage.ALREADY_ENROLLED})
 
             # Create the enrollment
             enrollment = Enrollment.objects.create(

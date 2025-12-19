@@ -7,6 +7,7 @@ Provides serialization for Category model with proper audit field handling.
 from rest_framework import serializers
 
 from categories.models import Category
+from core.texts import ErrorMessage
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -44,7 +45,7 @@ class CategorySerializer(serializers.ModelSerializer):
         value = value.strip()
 
         if not value:
-            raise serializers.ValidationError('Category name cannot be empty.')
+            raise serializers.ValidationError(ErrorMessage.CATEGORY_NAME_EMPTY)
 
         # Check uniqueness
         queryset = Category.objects.filter(name__iexact=value)
@@ -54,6 +55,6 @@ class CategorySerializer(serializers.ModelSerializer):
             queryset = queryset.exclude(pk=self.instance.pk)
 
         if queryset.exists():
-            raise serializers.ValidationError('Category with this name already exists.')
+            raise serializers.ValidationError(ErrorMessage.CATEGORY_NAME_ALREADY_EXISTS)
 
         return value

@@ -10,11 +10,11 @@ Serializers for course CRUD operations:
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from categories.api.serializers import CategorySerializer
 from categories.models import Category
+from core.texts import ErrorMessage, HelpText
 from courses.models import Course
 from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
@@ -138,7 +138,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False,
         allow_empty=True,
-        help_text='List of category UUIDs to associate with this course',
+        help_text=HelpText.COURSE_CATEGORY_IDS,
     )
 
     class Meta:
@@ -161,17 +161,17 @@ class CourseWriteSerializer(serializers.ModelSerializer):
                 'required': True,
                 'max_length': 255,
                 'error_messages': {
-                    'required': _('Course title is required.'),
-                    'blank': _('Course title cannot be blank.'),
-                    'max_length': _('Course title cannot exceed 255 characters.'),
+                    'required': ErrorMessage.COURSE_TITLE_REQUIRED,
+                    'blank': ErrorMessage.COURSE_TITLE_BLANK,
+                    'max_length': ErrorMessage.COURSE_TITLE_MAX_LENGTH,
                 },
             },
             'course_code': {
                 'required': True,
                 'max_length': 20,
                 'error_messages': {
-                    'required': _('Course code is required.'),
-                    'blank': _('Course code cannot be blank.'),
+                    'required': ErrorMessage.COURSE_CODE_REQUIRED,
+                    'blank': ErrorMessage.COURSE_CODE_BLANK,
                 },
             },
             'description': {
@@ -182,7 +182,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
                 'required': False,
                 'allow_null': True,
                 'min_value': 1,
-                'error_messages': {'min_value': _('Maximum students must be at least 1.')},
+                'error_messages': {'min_value': ErrorMessage.MAX_STUDENTS_MIN_1},
             },
             'video_url': {
                 'required': False,
@@ -205,7 +205,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
     def validate_course_code(self, value):
         """Normalize course code to uppercase and validate uniqueness"""
         if not value or not value.strip():
-            raise serializers.ValidationError(_('Course code cannot be empty.'))
+            raise serializers.ValidationError(ErrorMessage.COURSE_CODE_EMPTY)
 
         # Normalize to uppercase
         code = value.upper().strip()
@@ -214,9 +214,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
         import re
 
         if not re.match(r'^[A-Z0-9_-]+$', code):
-            raise serializers.ValidationError(
-                _('Course code can only contain letters, numbers, hyphens, and underscores.')
-            )
+            raise serializers.ValidationError(ErrorMessage.COURSE_CODE_INVALID_CHARS)
 
         # Check uniqueness
         queryset = Course.objects.filter(course_code=code)
@@ -225,7 +223,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
 
         if queryset.exists():
             raise serializers.ValidationError(
-                _('Course code "%(code)s" already exists.') % {'code': code}
+                ErrorMessage.COURSE_CODE_ALREADY_EXISTS % {'code': code}
             )
 
         return code
@@ -247,7 +245,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
 
         if missing_ids:
             raise serializers.ValidationError(
-                _('The following category IDs are invalid or inactive: %(ids)s')
+                ErrorMessage.INVALID_OR_INACTIVE_CATEGORY_IDS
                 % {'ids': ', '.join(str(id) for id in missing_ids)}
             )
 
@@ -256,9 +254,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
     def validate_max_students(self, value):
         """Validate that max_students is positive or null"""
         if value is not None and value <= 0:
-            raise serializers.ValidationError(
-                _('Maximum students must be a positive number or null for unlimited enrollment.')
-            )
+            raise serializers.ValidationError(ErrorMessage.MAX_STUDENTS_POSITIVE_OR_NULL)
         return value
 
     def validate_status(self, value):
@@ -266,21 +262,20 @@ class CourseWriteSerializer(serializers.ModelSerializer):
         valid_statuses = [choice[0] for choice in Course.STATUS_CHOICES]
         if value not in valid_statuses:
             raise serializers.ValidationError(
-                _('Invalid status. Must be one of: %(statuses)s')
-                % {'statuses': ', '.join(valid_statuses)}
+                ErrorMessage.INVALID_STATUS % {'statuses': ', '.join(valid_statuses)}
             )
         return value
 
     def validate_video_url(self, value):
         """Validate video URL format if provided"""
         if value and not value.startswith(('http://', 'https://')):
-            raise serializers.ValidationError(_('Video URL must start with http:// or https://'))
+            raise serializers.ValidationError(ErrorMessage.VIDEO_URL_INVALID_SCHEME)
         return value
 
     def validate_image_url(self, value):
         """Validate image URL format if provided"""
         if value and not value.startswith(('http://', 'https://')):
-            raise serializers.ValidationError(_('Image URL must start with http:// or https://'))
+            raise serializers.ValidationError(ErrorMessage.IMAGE_URL_INVALID_SCHEME)
         return value
 
     def validate(self, attrs):
@@ -312,11 +307,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
 
             if self.instance.status == Course.STATUS_IN_PROGRESS and enrolled_count > 0:
                 raise serializers.ValidationError(
-                    {
-                        'is_active': _(
-                            'Cannot disable a course that is in progress with enrolled students.'
-                        )
-                    }
+                    {'is_active': ErrorMessage.CANNOT_DISABLE_IN_PROGRESS_WITH_STUDENTS}
                 )
 
     def _validate_status_transition(self, attrs):
@@ -327,10 +318,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
             if not self._is_valid_transition(self.instance.status, new_status):
                 raise serializers.ValidationError(
                     {
-                        'status': _(
-                            'Invalid status transition from "%(from)s" to "%(to)s". '
-                            'Please follow the proper course workflow.'
-                        )
+                        'status': ErrorMessage.INVALID_STATUS_TRANSITION
                         % {
                             'from': self.instance.get_status_display(),
                             'to': dict(Course.STATUS_CHOICES).get(new_status, new_status),
@@ -354,11 +342,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
         if new_max is not None and enrolled_count > 0 and new_max < enrolled_count:
             raise serializers.ValidationError(
                 {
-                    'max_students': _(
-                        'Cannot set maximum students to %(new)d. '
-                        'Course already has %(current)d enrolled student(s). '
-                        'Maximum must be at least %(current)d.'
-                    )
+                    'max_students': ErrorMessage.CANNOT_SET_MAX_STUDENTS_BELOW_ENROLLED
                     % {'new': new_max, 'current': enrolled_count}
                 }
             )

@@ -1,5 +1,6 @@
 import django_filters
 
+from core.texts import HelpText
 from courses.models import Course
 
 
@@ -15,7 +16,7 @@ class CourseFilter(django_filters.FilterSet):
     """
 
     title = django_filters.CharFilter(
-        lookup_expr='icontains', help_text='Filter by course title/name'
+        lookup_expr='icontains', help_text=HelpText.COURSE_FILTER_TITLE
     )
     category = django_filters.UUIDFilter(field_name='categories__id')
     status = django_filters.ChoiceFilter(choices=Course.STATUS_CHOICES)
