@@ -26,6 +26,10 @@ This project extends the "Student Course Management System" by building, testing
 
 ## 🛠 Tech Stack
 
+## 📚 Developer Documentation
+
+- Module flows (models → serializers → viewsets): `docs/MODULE_FLOWS.md`
+
 - **Python**: 3.13+
 - **Framework**: Django 5.1.5
 - **API Framework**: Django REST Framework 3.15.2+
