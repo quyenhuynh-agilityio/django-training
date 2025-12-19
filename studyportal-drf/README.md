@@ -215,6 +215,15 @@ uv run python manage.py createsuperuser
 uv run python manage.py runserver
 ```
 
+Run with a specific settings module (and it will auto-load the matching `.env.<env>` if present):
+```bash
+# Local (config.settings.local)
+DJANGO_SETTINGS_MODULE=config.settings.local uv run python manage.py runserver
+
+# Production settings (config.settings.production)
+DJANGO_SETTINGS_MODULE=config.settings.production uv run python manage.py runserver
+```
+
 The server will start at `http://localhost:8000/`
 
 ## 🧪 Testing

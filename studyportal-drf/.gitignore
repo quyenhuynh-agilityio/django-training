@@ -274,6 +274,8 @@ precizen/media/
 .pytest_cache/
 .ipython/
 .env
+.env.local
+.env.production
 .envs/*
 !.envs/.local/
 

@@ -1,8 +1,11 @@
+import os
 import secrets
 from datetime import timedelta
 from pathlib import Path
 
 import environ
+
+from django.core.exceptions import ImproperlyConfigured
 
 # ==============================
 # ENVIRONMENT
@@ -11,10 +14,37 @@ env = environ.Env(DEBUG=(bool, False))
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Read .env file
-ENV_FILE = BASE_DIR / '.env'
-if ENV_FILE.exists():
-    environ.Env.read_env(ENV_FILE)
+# Read environment files (if present)
+# Precedence (highest → lowest):
+# 1) OS environment variables
+# 2) .env.<DJANGO_ENV> or ENV_FILE (if set)
+# 3) .env
+#
+# Examples:
+# - DJANGO_ENV=local      -> reads .env.local
+# - DJANGO_ENV=production -> reads .env.production
+# - ENV_FILE=.env.prod    -> reads that file instead
+explicit_env_file = os.environ.get('ENV_FILE')
+django_env = os.environ.get('DJANGO_ENV')
+
+# If DJANGO_ENV isn't set, infer from DJANGO_SETTINGS_MODULE (set early by manage.py / scripts / WSGI).
+if not django_env:
+    settings_module = os.environ.get('DJANGO_SETTINGS_MODULE', '')
+    inferred = settings_module.split('.')[-1] if settings_module else ''
+    if inferred in {'local', 'production', 'test'}:
+        django_env = inferred
+
+candidate_files: list[Path] = []
+if explicit_env_file:
+    candidate_files.append((BASE_DIR / explicit_env_file).resolve())
+elif django_env:
+    candidate_files.append(BASE_DIR / f'.env.{django_env}')
+
+candidate_files.append(BASE_DIR / '.env')
+
+for path in candidate_files:
+    if path.exists():
+        environ.Env.read_env(path)
 
 SECRET_KEY = env('SECRET_KEY', default=secrets.token_urlsafe(50))
 
@@ -144,7 +174,6 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-    # Allow public access by default
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
@@ -233,3 +262,14 @@ PASSWORD_RESET_DEBUG_EXPOSE_TOKENS = env.bool('PASSWORD_RESET_DEBUG_EXPOSE_TOKEN
 PASSWORD_RESET_DISABLE_EMAIL = env.bool('PASSWORD_RESET_DISABLE_EMAIL', default=False)
 # Frontend URL used to build reset link (falls back to localhost)
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+
+# ==============================
+# ENVIRONMENT VALIDATION
+# ==============================
+# Ensure base.py is never used directly
+settings_module = os.environ.get('DJANGO_SETTINGS_MODULE', '')
+if settings_module == 'config.settings.base':
+    raise ImproperlyConfigured(
+        "Don't use config.settings.base directly. "
+        'Use config.settings.local, config.settings.production, or config.settings.test'
+    )
