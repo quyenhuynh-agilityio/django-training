@@ -16,10 +16,9 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from django.db.models import BooleanField, Case, Count, F, Q, Value, When
 from django.utils.translation import gettext_lazy as _
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.response import Response
 
 from courses.models import Course
 from enrollments.api.serializers import EnrolledStudentSerializer
@@ -282,26 +281,20 @@ class CourseViewSet(viewsets.ModelViewSet):
         )
 
         if course.is_active and course.status == Course.STATUS_IN_PROGRESS and enrolled > 0:
-            return Response(
-                {
-                    'message': _(
-                        'Cannot delete a course that is in progress with enrolled students.'
-                    ),
-                    'code': 'COURSE_IN_PROGRESS_WITH_STUDENTS',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return self.bad_request(
+                message=_('Cannot delete a course that is in progress with enrolled students.'),
+                code='COURSE_IN_PROGRESS_WITH_STUDENTS',
             )
 
         # Perform soft delete
         course.soft_delete()
 
-        return Response(
+        return self.ok(
             {
                 'message': _('Course deleted successfully.'),
                 'course_id': str(course.id),
                 'course_code': course.course_code,
-            },
-            status=status.HTTP_200_OK,
+            }
         )
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -354,12 +347,11 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         # Verify user is the course instructor
         if course.instructor != request.user:
-            return Response(
+            return self.forbidden(
                 {
                     'error': _('Only the course instructor can view enrolled students.'),
                     'code': 'INSTRUCTOR_ONLY',
-                },
-                status=status.HTTP_403_FORBIDDEN,
+                }
             )
 
         # Get active enrollments with student details
@@ -377,7 +369,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         # Return all results if pagination is disabled
         serializer = self.get_serializer(enrollments, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return self.ok(serializer.data)
 
     # ═══════════════════════════════════════════════════════════════════════════
     #   S W A G G E R   D O C U M E N T A T I O N

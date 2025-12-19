@@ -15,9 +15,8 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-from rest_framework import permissions, serializers, viewsets
+from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
-from rest_framework.response import Response
 
 from core.api_views import CommonViewSet
 
@@ -128,34 +127,22 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
         Returns user data without password.
         """
         serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
 
-        try:
-            serializer.is_valid(raise_exception=True)
-            user = serializer.save()
-
-            return self.created(
-                {
-                    'message': 'Registration successful. Please login.',
-                    'user': {
-                        'id': str(user.id),
-                        'email': user.email,
-                        'username': user.username,
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
-                        'role': user.role,
-                    },
-                }
-            )
-
-        except serializers.ValidationError as e:
-            return self.bad_request(
-                message='Registration failed. Please check your input.', code=e.detail
-            )
-
-        except Exception as e:
-            return self.server_error(
-                message='An unexpected error occurred during registration.', code=e.detail
-            )
+        return self.created(
+            {
+                'message': 'Registration successful. Please login.',
+                'user': {
+                    'id': str(user.id),
+                    'email': user.email,
+                    'username': user.username,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'role': user.role,
+                },
+            }
+        )
 
     # ============================================
     # USER LOGIN
@@ -210,36 +197,26 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
         Works for all roles (student, instructor, admin).
         """
         serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
 
-        try:
-            serializer.is_valid(raise_exception=True)
-            user = serializer.validated_data['user']
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
 
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-
-            return self.ok(
-                {
-                    'message': 'Login successful',
-                    'access_token': str(refresh.access_token),
-                    'refresh_token': str(refresh),
-                    'user': {
-                        'id': str(user.id),
-                        'email': user.email,
-                        'username': user.username,
-                        'full_name': user.full_name,
-                        'role': user.role,
-                    },
-                }
-            )
-
-        except serializers.ValidationError as e:
-            return self.bad_request(message='Login failed', code=e.detail)
-
-        except Exception as e:
-            return self.server_error(
-                message='An unexpected error occurred during login', code=e.detail
-            )
+        return self.ok(
+            {
+                'message': 'Login successful',
+                'access_token': str(refresh.access_token),
+                'refresh_token': str(refresh),
+                'user': {
+                    'id': str(user.id),
+                    'email': user.email,
+                    'username': user.username,
+                    'full_name': user.full_name,
+                    'role': user.role,
+                },
+            }
+        )
 
     # ============================================
     # USER LOGOUT
@@ -284,37 +261,37 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
 
         Note: Requires 'rest_framework_simplejwt.token_blacklist' in INSTALLED_APPS
         """
+        refresh_token = request.data.get('refresh')
+
+        if not refresh_token:
+            return self.bad_request(
+                message='Logout failed', code={'refresh': ['This field is required.']}
+            )
+
         try:
-            refresh_token = request.data.get('refresh')
-
-            if not refresh_token:
-                return self.bad_request(
-                    message='Logout failed', code={'refresh': ['This field is required.']}
-                )
-
-            # Blacklist the token
-            try:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
-            except AttributeError:
-                # Blacklist app not installed - just return success
-                # In production, you should install token_blacklist
-                return self.ok(
-                    {
-                        'message': 'Logout successful',
-                        'warning': 'Token blacklist not enabled. Add rest_framework_simplejwt.token_blacklist to INSTALLED_APPS.',
-                    }
-                )
-
-            return self.ok({'message': 'Logout successful'})
-
+            token = RefreshToken(refresh_token)
         except TokenError:
             return self.bad_request(
                 message='Logout failed', code={'refresh': ['Token is invalid or expired']}
             )
 
-        except Exception as e:
-            return self.bad_request(message='Logout failed', code={'error': str(e)})
+        try:
+            token.blacklist()
+        except AttributeError:
+            # Blacklist app not installed - just return success
+            # In production, you should install token_blacklist
+            return self.ok(
+                {
+                    'message': 'Logout successful',
+                    'warning': 'Token blacklist not enabled. Add rest_framework_simplejwt.token_blacklist to INSTALLED_APPS.',
+                }
+            )
+        except TokenError:
+            return self.bad_request(
+                message='Logout failed', code={'refresh': ['Token is invalid or expired']}
+            )
+
+        return self.ok({'message': 'Logout successful'})
 
     # ============================================
     # PASSWORD RESET REQUEST
@@ -456,30 +433,20 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
         Token is single-use and expires after 24 hours.
         """
         serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        try:
-            serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        new_password = serializer.validated_data['new_password']
 
-            user = serializer.validated_data['user']
-            new_password = serializer.validated_data['new_password']
+        # Set new password
+        user.set_password(new_password)
+        user.save()
 
-            # Set new password
-            user.set_password(new_password)
-            user.save()
-
-            return self.ok(
-                {
-                    'message': 'Password has been reset successfully. You can now login with your new password.'
-                }
-            )
-
-        except serializers.ValidationError as e:
-            return self.bad_request(message='Password reset failed', code=e.detail)
-
-        except Exception as e:
-            return self.server_error(
-                message='An unexpected error occurred during password reset.', code=e.detail
-            )
+        return self.ok(
+            {
+                'message': 'Password has been reset successfully. You can now login with your new password.'
+            }
+        )
 
     # ============================================
     # CHANGE PASSWORD (AUTHENTICATED)
@@ -520,28 +487,23 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
         User remains logged in (JWT token still valid).
         """
         serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        try:
-            serializer.is_valid(raise_exception=True)
+        user = request.user
+        old_password = serializer.validated_data['old_password']
+        new_password = serializer.validated_data['new_password']
 
-            user = request.user
-            old_password = serializer.validated_data['old_password']
-            new_password = serializer.validated_data['new_password']
+        # Verify old password
+        if not user.check_password(old_password):
+            return self.bad_request(
+                message='Password change failed', code={'old_password': ['Wrong password.']}
+            )
 
-            # Verify old password
-            if not user.check_password(old_password):
-                return self.bad_request(
-                    message='Password change failed', code={'old_password': ['Wrong password.']}
-                )
+        # Set new password
+        user.set_password(new_password)
+        user.save()
 
-            # Set new password
-            user.set_password(new_password)
-            user.save()
-
-            return self.ok({'message': 'Password changed successfully'})
-
-        except serializers.ValidationError as e:
-            return self.bad_request(message='Password change failed', code=e.detail)
+        return self.ok({'message': 'Password changed successfully'})
 
     # ============================================
     # USER PROFILE
@@ -570,20 +532,16 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
 
         if request.method == 'GET':
             serializer = self.get_serializer(user)
-            return Response(serializer.data)
+            return self.ok(serializer.data)
 
         # PUT or PATCH
         serializer = self.get_serializer(
             user, data=request.data, partial=(request.method == 'PATCH')
         )
 
-        try:
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data)
-
-        except serializers.ValidationError as e:
-            return self.bad_request(message='Profile update failed', code=e.detail)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return self.ok(serializer.data)
 
 
 __all__ = ['AuthViewSet']
