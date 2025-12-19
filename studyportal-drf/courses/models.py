@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from core.choices import CourseStatus, UserRole
 from core.texts import ErrorMessage, HelpText
 
 
@@ -13,17 +14,12 @@ class Course(models.Model):
     """
 
     # ─── Course Status Workflow ─────────────────────────────────
-    STATUS_DRAFT = 'draft'
-    STATUS_ACTIVE = 'active'
-    STATUS_IN_PROGRESS = 'in_progress'
-    STATUS_COMPLETED = 'completed'
+    STATUS_DRAFT = CourseStatus.DRAFT
+    STATUS_ACTIVE = CourseStatus.ACTIVE
+    STATUS_IN_PROGRESS = CourseStatus.IN_PROGRESS
+    STATUS_COMPLETED = CourseStatus.COMPLETED
 
-    STATUS_CHOICES = [
-        (STATUS_DRAFT, 'Draft'),
-        (STATUS_ACTIVE, 'Active'),
-        (STATUS_IN_PROGRESS, 'In Progress'),
-        (STATUS_COMPLETED, 'Completed'),
-    ]
+    STATUS_CHOICES = CourseStatus.choices
 
     # ─── Primary Key & Basic Info ───────────────────────────────
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -63,7 +59,7 @@ class Course(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         related_name='taught_courses',
-        limit_choices_to={'role': 'instructor'},
+        limit_choices_to={'role': UserRole.INSTRUCTOR},
         help_text=HelpText.COURSE_INSTRUCTOR,
     )
 
@@ -124,7 +120,7 @@ class Course(models.Model):
     # ─── Model Validation (Prevents Bad Data) ───────────────────
     def clean(self):
         # Only real instructors can be assigned
-        if self.instructor and self.instructor.role != 'instructor':
+        if self.instructor and self.instructor.role != UserRole.INSTRUCTOR:
             raise ValidationError({'instructor': ErrorMessage.ONLY_INSTRUCTORS_CAN_TEACH})
 
         # Prevent disabling in-progress course with students

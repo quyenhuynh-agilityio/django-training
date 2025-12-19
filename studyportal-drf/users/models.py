@@ -3,6 +3,7 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from core.choices import UserRole
 from core.texts import HelpText
 
 
@@ -14,15 +15,11 @@ class User(AbstractUser):
     """
 
     # ─── Role System (RBAC) ─────────────────────────────────────
-    ROLE_STUDENT = 'student'  # Can enroll in courses
-    ROLE_INSTRUCTOR = 'instructor'  # Can create & manage courses
-    ROLE_ADMIN = 'admin'  # Full access via Django admin
+    ROLE_STUDENT = UserRole.STUDENT  # Can enroll in courses
+    ROLE_INSTRUCTOR = UserRole.INSTRUCTOR  # Can create & manage courses
+    ROLE_ADMIN = UserRole.ADMIN  # Full access via Django admin
 
-    ROLE_CHOICES = [
-        (ROLE_STUDENT, 'Student'),
-        (ROLE_INSTRUCTOR, 'Instructor'),
-        (ROLE_ADMIN, 'Admin'),
-    ]
+    ROLE_CHOICES = UserRole.choices
 
     # ─── Primary Key & Core Fields ──────────────────────────────
     id = models.UUIDField(
@@ -79,12 +76,12 @@ class User(AbstractUser):
     @property
     def is_student(self):
         """Check if user is a student"""
-        return self.role == 'student'
+        return self.role == self.ROLE_STUDENT
 
     @property
     def is_instructor(self):
         """Check if user is an instructor"""
-        return self.role == 'instructor'
+        return self.role == self.ROLE_INSTRUCTOR
 
     def clean(self):
         """Model-level validation"""

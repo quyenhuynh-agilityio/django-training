@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from core.choices import EnrollmentStatus, UserRole
 from core.texts import ErrorMessage, HelpText
 from courses.models import Course
 
@@ -20,15 +21,11 @@ class Enrollment(models.Model):
     Enforces: one active enrollment per student per course.
     """
 
-    STATUS_ACTIVE = 'active'
-    STATUS_COMPLETED = 'completed'
-    STATUS_DROPPED = 'dropped'
+    STATUS_ACTIVE = EnrollmentStatus.ACTIVE
+    STATUS_COMPLETED = EnrollmentStatus.COMPLETED
+    STATUS_DROPPED = EnrollmentStatus.DROPPED
 
-    STATUS_CHOICES = [
-        (STATUS_ACTIVE, 'Active'),
-        (STATUS_COMPLETED, 'Completed'),
-        (STATUS_DROPPED, 'Dropped'),
-    ]
+    STATUS_CHOICES = EnrollmentStatus.choices
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -36,7 +33,7 @@ class Enrollment(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='enrollments',
-        limit_choices_to={'role': 'student'},
+        limit_choices_to={'role': UserRole.STUDENT},
         help_text=HelpText.ENROLLMENT_STUDENT_FK,
     )
 
@@ -78,7 +75,7 @@ class Enrollment(models.Model):
         or when the course is being modified.
         """
         # 1. Only students can enroll
-        if self.student.role != 'student':
+        if self.student.role != UserRole.STUDENT:
             raise ValidationError(ErrorMessage.ONLY_STUDENTS_CAN_BE_ENROLLED)
 
         # 2. Only validate course enrollment rules for NEW enrollments
@@ -111,7 +108,7 @@ class Enrollment(models.Model):
         Used in: Student mobile app, API endpoint.
         """
         self.is_active = False
-        self.status = self.STATUS_DROPPED
+        self.status = EnrollmentStatus.DROPPED
         self.save(update_fields=['is_active', 'status', 'updated_at'])
 
 
