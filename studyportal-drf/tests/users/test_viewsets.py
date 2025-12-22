@@ -9,7 +9,7 @@ pytestmark = pytest.mark.django_db
 
 def test_auth_logout_requires_authentication(api_client):
     response = api_client.post(
-        '/api/v1/users/auth/logout/',
+        '/api/v1/auth/logout/',
         {'refresh': 'anything'},
         format='json',
     )
@@ -21,7 +21,7 @@ def test_auth_logout_requires_refresh_field(api_client, create_user):
     user = create_user(email='student@example.com', username='student', role='student')
     api_client.force_authenticate(user=user)
 
-    response = api_client.post('/api/v1/users/auth/logout/', {}, format='json')
+    response = api_client.post('/api/v1/auth/logout/', {}, format='json')
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data['errors']['message'] == ['Logout failed']
@@ -33,7 +33,7 @@ def test_auth_logout_rejects_invalid_refresh_token(api_client, create_user):
     api_client.force_authenticate(user=user)
 
     response = api_client.post(
-        '/api/v1/users/auth/logout/',
+        '/api/v1/auth/logout/',
         {'refresh': 'not-a-token'},
         format='json',
     )
@@ -50,7 +50,7 @@ def test_auth_logout_success_warns_when_blacklist_app_missing(api_client, create
     refresh = str(RefreshToken.for_user(user))
 
     response = api_client.post(
-        '/api/v1/users/auth/logout/',
+        '/api/v1/auth/logout/',
         {'refresh': refresh},
         format='json',
     )
@@ -70,7 +70,7 @@ def test_auth_password_reset_exposes_debug_tokens_when_enabled(api_client, creat
     create_user(email='reset@example.com', username='resetuser', is_active=True)
 
     response = api_client.post(
-        '/api/v1/users/auth/password-reset/',
+        '/api/v1/auth/password-reset/',
         {'email': 'reset@example.com'},
         format='json',
     )

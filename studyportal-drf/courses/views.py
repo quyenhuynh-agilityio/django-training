@@ -2,8 +2,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_protect
 
-from core.course_queries import build_course_list_context
 from enrollments.models import Enrollment
+from utils.course_queries import build_course_list_context
 
 from .models import Course
 

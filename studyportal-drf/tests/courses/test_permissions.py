@@ -1,79 +1,167 @@
-import pytest
+from unittest.mock import Mock
 
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth import get_user_model
+from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
-from courses.api.permissions import IsInstructorOrReadOnly, IsStudent
+from courses.api.permissions import IsCourseInstructor, IsInstructor, IsStudent
 
-pytestmark = pytest.mark.django_db
-
-
-factory = APIRequestFactory()
+User = get_user_model()
 
 
-def _request(method: str, user=None):
-    request = getattr(factory, method.lower())('/')
-    request.user = user
-    return request
+class IsInstructorPermissionTest(TestCase):
+    """Test IsInstructor permission class"""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.permission = IsInstructor()
+        self.view = Mock()
+
+    def test_authenticated_instructor_has_permission(self):
+        """Authenticated instructor should have permission"""
+        user = Mock(is_authenticated=True, is_instructor=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertTrue(self.permission.has_permission(request, self.view))
+
+    def test_authenticated_non_instructor_denied(self):
+        """Authenticated non-instructor should be denied"""
+        user = Mock(is_authenticated=True, is_instructor=False)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
+
+    def test_unauthenticated_user_denied(self):
+        """Unauthenticated user should be denied"""
+        user = Mock(is_authenticated=False, is_instructor=False)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
+
+    def test_unauthenticated_instructor_flag_denied(self):
+        """Unauthenticated user with instructor flag should still be denied"""
+        user = Mock(is_authenticated=False, is_instructor=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
 
 
-def test_safe_methods_allow_any_user():
-    permission = IsInstructorOrReadOnly()
-    request = _request('get', AnonymousUser())
+class IsCourseInstructorPermissionTest(TestCase):
+    """Test IsCourseInstructor permission class"""
 
-    assert permission.has_permission(request, view=None) is True
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.permission = IsCourseInstructor()
+        self.view = Mock()
+
+    def test_view_level_authenticated_instructor_has_permission(self):
+        """Authenticated instructor should pass view-level check"""
+        user = Mock(is_authenticated=True, is_instructor=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertTrue(self.permission.has_permission(request, self.view))
+
+    def test_view_level_authenticated_non_instructor_denied(self):
+        """Authenticated non-instructor should fail view-level check"""
+        user = Mock(is_authenticated=True, is_instructor=False)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
+
+    def test_view_level_unauthenticated_denied(self):
+        """Unauthenticated user should fail view-level check"""
+        user = Mock(is_authenticated=False, is_instructor=False)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
+
+    def test_object_level_course_owner_has_permission(self):
+        """Course owner should have object-level permission"""
+        user = Mock(is_authenticated=True, is_instructor=True, is_staff=False)
+        request = self.factory.get('/')
+        request.user = user
+
+        course = Mock(instructor=user)
+
+        self.assertTrue(self.permission.has_object_permission(request, self.view, course))
+
+    def test_object_level_different_instructor_denied(self):
+        """Different instructor should be denied object-level permission"""
+        user = Mock(is_authenticated=True, is_instructor=True, is_staff=False)
+        other_user = Mock(is_authenticated=True, is_instructor=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        course = Mock(instructor=other_user)
+
+        self.assertFalse(self.permission.has_object_permission(request, self.view, course))
+
+    def test_object_level_staff_has_permission(self):
+        """Staff user should have object-level permission regardless of ownership"""
+        user = Mock(is_authenticated=True, is_instructor=True, is_staff=True)
+        other_user = Mock(is_authenticated=True, is_instructor=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        course = Mock(instructor=other_user)
+
+        self.assertTrue(self.permission.has_object_permission(request, self.view, course))
+
+    def test_object_level_staff_non_instructor_has_permission(self):
+        """Staff user should have permission even if not flagged as instructor"""
+        user = Mock(is_authenticated=True, is_instructor=False, is_staff=True)
+        other_user = Mock(is_authenticated=True, is_instructor=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        course = Mock(instructor=other_user)
+
+        self.assertTrue(self.permission.has_object_permission(request, self.view, course))
 
 
-def test_write_denied_for_non_instructors(create_user):
-    permission = IsInstructorOrReadOnly()
-    student = create_user(email='student@example.com', username='student', role='student')
-    request = _request('post', student)
+class IsStudentPermissionTest(TestCase):
+    """Test IsStudent permission class"""
 
-    assert permission.has_permission(request, view=None) is False
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.permission = IsStudent()
+        self.view = Mock()
 
+    def test_authenticated_student_has_permission(self):
+        """Authenticated student should have permission"""
+        user = Mock(is_authenticated=True, is_student=True)
+        request = self.factory.get('/')
+        request.user = user
 
-def test_write_allowed_for_instructors(create_user):
-    permission = IsInstructorOrReadOnly()
-    instructor = create_user(
-        email='instructor@example.com', username='instructor', role='instructor'
-    )
-    request = _request('post', instructor)
+        self.assertTrue(self.permission.has_permission(request, self.view))
 
-    assert permission.has_permission(request, view=None) is True
+    def test_authenticated_non_student_denied(self):
+        """Authenticated non-student should be denied"""
+        user = Mock(is_authenticated=True, is_student=False)
+        request = self.factory.get('/')
+        request.user = user
 
+        self.assertFalse(self.permission.has_permission(request, self.view))
 
-def test_object_permission_allows_owner(create_course, create_user):
-    permission = IsInstructorOrReadOnly()
-    course = create_course()
-    request = _request('patch', course.instructor)
+    def test_unauthenticated_user_denied(self):
+        """Unauthenticated user should be denied"""
+        user = Mock(is_authenticated=False, is_student=False)
+        request = self.factory.get('/')
+        request.user = user
 
-    assert permission.has_object_permission(request, view=None, obj=course) is True
+        self.assertFalse(self.permission.has_permission(request, self.view))
 
+    def test_unauthenticated_student_flag_denied(self):
+        """Unauthenticated user with student flag should still be denied"""
+        user = Mock(is_authenticated=False, is_student=True)
+        request = self.factory.get('/')
+        request.user = user
 
-def test_object_permission_denies_other_instructor(create_course, create_user):
-    permission = IsInstructorOrReadOnly()
-    course = create_course()
-    other_instructor = create_user(email='other@example.com', username='other', role='instructor')
-    request = _request('patch', other_instructor)
-
-    assert permission.has_object_permission(request, view=None, obj=course) is False
-
-
-def test_object_permission_allows_safe_method(create_course, create_user):
-    permission = IsInstructorOrReadOnly()
-    course = create_course()
-    student = create_user(email='student2@example.com', username='student2', role='student')
-    request = _request('get', student)
-
-    assert permission.has_object_permission(request, view=None, obj=course) is True
-
-
-def test_is_student_allows_students_only(create_user):
-    permission = IsStudent()
-    student = create_user(email='student3@example.com', username='student3', role='student')
-    instructor = create_user(
-        email='instructor2@example.com', username='instructor2', role='instructor'
-    )
-
-    assert permission.has_permission(_request('get', student), view=None) is True
-    assert permission.has_permission(_request('get', instructor), view=None) is False
+        self.assertFalse(self.permission.has_permission(request, self.view))

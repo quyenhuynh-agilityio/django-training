@@ -15,13 +15,16 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from core.texts import ErrorMessage, HelpText
-from utils.serializers import AuditFieldsBase, CamelCaseSerializerMixin, audit_read_only_fields
-
-from .bases import (
-    EmailNormalizationBase,
-    NameValidationBase,
-    PasswordConfirmationBase,
-    ResetTokenValidationBase,
+from utils.serializers import (
+    AuditFieldsBase,
+    CamelCaseSerializerMixin,
+    audit_read_only_fields,
+)
+from utils.validators import (
+    normalize_email,
+    validate_name,
+    validate_password_confirmation,
+    validate_reset_token,
 )
 
 User = get_user_model()
@@ -29,9 +32,6 @@ User = get_user_model()
 
 class UserRegistrationSerializer(
     CamelCaseSerializerMixin,
-    EmailNormalizationBase,
-    NameValidationBase,
-    PasswordConfirmationBase,
     serializers.ModelSerializer,
 ):
     """
@@ -58,7 +58,6 @@ class UserRegistrationSerializer(
         help_text=HelpText.MUST_MATCH_PASSWORD,
     )
 
-    # Use DRF's built-in UniqueValidator to avoid race conditions
     email = serializers.EmailField(
         validators=[UniqueValidator(queryset=User.objects.all())],
         required=True,
@@ -89,9 +88,13 @@ class UserRegistrationSerializer(
             'last_name': {'required': True},
         }
 
+    # ─────────────────────────────────────────────────────
+    # Field validation
+    # ─────────────────────────────────────────────────────
+
     def validate_email(self, value):
         """Normalize email to lowercase"""
-        return self.normalize_email(value)
+        return normalize_email(value)
 
     def validate_username(self, value):
         """Validate username format"""
@@ -102,24 +105,27 @@ class UserRegistrationSerializer(
 
     def validate_first_name(self, value):
         """Validate and normalize first name"""
-        return self.validate_name(value, 'First name')
+        return validate_name(value, 'First name')
 
     def validate_last_name(self, value):
         """Validate and normalize last name"""
-        return self.validate_name(value, 'Last name')
+        return validate_name(value, 'Last name')
 
-    # ───────────────────────────────────────────────────────────────────────
-    # Object-level Validation
-    # ───────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────
+    # Object-level validation
+    # ─────────────────────────────────────────────────────
 
     def validate(self, attrs):
         """Validate password confirmation"""
-        self.check_password_match(attrs['password'], attrs['password_confirm'])
+        validate_password_confirmation(
+            attrs['password'],
+            attrs['password_confirm'],
+        )
         return attrs
 
-    # ───────────────────────────────────────────────────────────────────────
-    # Create User
-    # ───────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────
+    # Create user
+    # ─────────────────────────────────────────────────────
 
     def create(self, validated_data):
         """
@@ -132,7 +138,15 @@ class UserRegistrationSerializer(
         return User.objects.create_user(role='student', **validated_data)
 
 
-class UserLoginSerializer(CamelCaseSerializerMixin, EmailNormalizationBase, serializers.Serializer):
+# ─────────────────────────────────────────────────────────────
+# Login
+# ─────────────────────────────────────────────────────────────
+
+
+class UserLoginSerializer(
+    CamelCaseSerializerMixin,
+    serializers.Serializer,
+):
     """
     Authenticates user based on email + password.
 
@@ -144,12 +158,13 @@ class UserLoginSerializer(CamelCaseSerializerMixin, EmailNormalizationBase, seri
 
     email = serializers.EmailField(help_text=HelpText.USER_EMAIL_ADDRESS)
     password = serializers.CharField(
-        write_only=True, style={'input_type': 'password'}, help_text=HelpText.USER_PASSWORD
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text=HelpText.USER_PASSWORD,
     )
 
     def validate_email(self, value):
-        """Normalize email to lowercase"""
-        return self.normalize_email(value)
+        return normalize_email(value)
 
     def validate(self, attrs):
         """
@@ -173,9 +188,13 @@ class UserLoginSerializer(CamelCaseSerializerMixin, EmailNormalizationBase, seri
         return attrs
 
 
+# ─────────────────────────────────────────────────────────────
+# Password reset request
+# ─────────────────────────────────────────────────────────────
+
+
 class PasswordResetRequestSerializer(
     CamelCaseSerializerMixin,
-    EmailNormalizationBase,
     serializers.Serializer,
 ):
     """
@@ -190,14 +209,16 @@ class PasswordResetRequestSerializer(
     email = serializers.EmailField(help_text=HelpText.PASSWORD_RESET_EMAIL)
 
     def validate_email(self, value):
-        """Normalize email to lowercase"""
-        return self.normalize_email(value)
+        return normalize_email(value)
+
+
+# ─────────────────────────────────────────────────────────────
+# Password reset confirm
+# ─────────────────────────────────────────────────────────────
 
 
 class PasswordResetConfirmSerializer(
     CamelCaseSerializerMixin,
-    PasswordConfirmationBase,
-    ResetTokenValidationBase,
     serializers.Serializer,
 ):
     """
@@ -226,25 +247,33 @@ class PasswordResetConfirmSerializer(
     )
 
     def validate(self, attrs):
-        """
-        Validate password reset request
+        """Validate password reset request
 
         Steps:
         1. Check password confirmation match
         2. Validate UID and token
         3. Return user for password update
         """
-        # Step 1: confirm new passwords match
-        self.check_password_match(attrs['new_password'], attrs['new_password_confirm'])
+        # 1. Confirm passwords match
+        validate_password_confirmation(
+            attrs['new_password'],
+            attrs['new_password_confirm'],
+        )
 
-        # Step 2-3: validate UID + token
-        user = self.validate_reset_token(attrs['uid'], attrs['token'])
+        # 2. Validate UID + token and return user
+        user = validate_reset_token(attrs['uid'], attrs['token'])
         attrs['user'] = user
         return attrs
 
 
+# ─────────────────────────────────────────────────────────────
+# Change password
+# ─────────────────────────────────────────────────────────────
+
+
 class ChangePasswordSerializer(
-    CamelCaseSerializerMixin, PasswordConfirmationBase, serializers.Serializer
+    CamelCaseSerializerMixin,
+    serializers.Serializer,
 ):
     """
     Allows already authenticated users to change their password.
@@ -257,7 +286,9 @@ class ChangePasswordSerializer(
     """
 
     old_password = serializers.CharField(
-        write_only=True, style={'input_type': 'password'}, help_text=HelpText.CURRENT_PASSWORD
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text=HelpText.CURRENT_PASSWORD,
     )
     new_password = serializers.CharField(
         write_only=True,
@@ -283,7 +314,10 @@ class ChangePasswordSerializer(
     def validate(self, attrs):
         """Validate password change request"""
         # Confirm new passwords match
-        self.check_password_match(attrs['new_password'], attrs['new_password_confirm'])
+        validate_password_confirmation(
+            attrs['new_password'],
+            attrs['new_password_confirm'],
+        )
 
         # New password must be different from old
         if attrs['old_password'] == attrs['new_password']:
@@ -294,7 +328,16 @@ class ChangePasswordSerializer(
         return attrs
 
 
-class UserProfileSerializer(CamelCaseSerializerMixin, AuditFieldsBase, serializers.ModelSerializer):
+# ─────────────────────────────────────────────────────────────
+# User profile
+# ─────────────────────────────────────────────────────────────
+
+
+class UserProfileSerializer(
+    CamelCaseSerializerMixin,
+    AuditFieldsBase,
+    serializers.ModelSerializer,
+):
     """
     Returns full user profile details.
 

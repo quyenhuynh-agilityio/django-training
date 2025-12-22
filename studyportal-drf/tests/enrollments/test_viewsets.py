@@ -15,7 +15,7 @@ def test_enrollment_list_viewset(api_client, create_user, create_course, create_
     create_enrollment(student=student, course=course)
 
     api_client.force_authenticate(user=student)
-    response = api_client.get('/api/v1/enrollments/students/enrollments/')
+    response = api_client.get('/api/v1/students/enrollments/')
 
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data['results']) == 1
@@ -27,7 +27,7 @@ def test_enrollment_retrieve_viewset(api_client, create_user, create_enrollment)
     enrollment = create_enrollment(student=student)
 
     api_client.force_authenticate(user=student)
-    response = api_client.get(f'/api/v1/enrollments/students/enrollments/{enrollment.id}/')
+    response = api_client.get(f'/api/v1/students/enrollments/{enrollment.id}/')
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data['course']['title'] == enrollment.course.title
@@ -40,7 +40,7 @@ def test_enrollment_enroll_action(api_client, create_user, create_course):
 
     api_client.force_authenticate(user=student)
     response = api_client.post(
-        '/api/v1/enrollments/students/enrollments/enroll/',
+        '/api/v1/students/enrollments/enroll/',
         {'course_id': str(course.id)},
         format='json',
     )
@@ -57,7 +57,7 @@ def test_enrollment_enroll_duplicate(api_client, create_user, create_course, cre
 
     api_client.force_authenticate(user=student)
     response = api_client.post(
-        '/api/v1/enrollments/students/enrollments/enroll/',
+        '/api/v1/students/enrollments/enroll/',
         {'course_id': str(course.id)},
         format='json',
     )
@@ -71,7 +71,7 @@ def test_enrollment_leave_action(api_client, create_user, create_enrollment):
     enrollment = create_enrollment(student=student)
 
     api_client.force_authenticate(user=student)
-    response = api_client.delete(f'/api/v1/enrollments/students/enrollments/{enrollment.id}/leave/')
+    response = api_client.delete(f'/api/v1/students/enrollments/{enrollment.id}/leave/')
 
     assert response.status_code == status.HTTP_200_OK
     assert 'Successfully left' in response.data['message']

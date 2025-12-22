@@ -3,7 +3,7 @@ import pytest
 from django.core.cache import cache
 from django.test import RequestFactory
 
-from core.course_queries import (
+from utils.course_queries import (
     build_course_list_context,
     filter_courses_by_category,
     filter_courses_by_search_query,
