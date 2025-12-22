@@ -5,7 +5,12 @@ Combines all authentication endpoints into a single ViewSet.
 Uses custom actions for each endpoint with proper response handling.
 """
 
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -32,6 +37,205 @@ from .serializers import (
 User = get_user_model()
 
 
+@extend_schema_view(
+    register=extend_schema(
+        summary='Register new student',
+        description='Create a new student account with email and password',
+        request=UserRegistrationSerializer,
+        responses={
+            201: OpenApiResponse(
+                description='User registered successfully',
+                examples=[
+                    OpenApiExample(
+                        'Success',
+                        value={
+                            'message': 'Registration successful. Please login.',
+                            'user': {
+                                'id': '123e4567-e89b-12d3-a456-426614174000',
+                                'email': 'student@example.com',
+                                'username': 'student123',
+                                'first_name': 'John',
+                                'last_name': 'Doe',
+                                'role': 'student',
+                            },
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Validation errors',
+                examples=[
+                    OpenApiExample(
+                        'Email exists',
+                        value={'email': ['A user with this email address already exists.']},
+                    ),
+                ],
+            ),
+        },
+        tags=['Authentication'],
+    ),
+    login=extend_schema(
+        summary='User login',
+        description='Authenticate user with email and password, returns JWT tokens',
+        request=UserLoginSerializer,
+        responses={
+            200: OpenApiResponse(
+                description='Login successful',
+                examples=[
+                    OpenApiExample(
+                        'Success',
+                        value={
+                            'message': 'Login successful',
+                            'access_token': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
+                            'refresh_token': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
+                            'user': {
+                                'id': '123e4567-e89b-12d3-a456-426614174000',
+                                'email': 'student@example.com',
+                                'username': 'student123',
+                                'full_name': 'John Doe',
+                                'role': 'student',
+                            },
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Invalid credentials',
+                examples=[
+                    OpenApiExample(
+                        'Invalid credentials',
+                        value={
+                            'message': 'Login failed',
+                            'errors': {'detail': 'Invalid email or password.'},
+                        },
+                    )
+                ],
+            ),
+        },
+        tags=['Authentication'],
+    ),
+    logout=extend_schema(
+        summary='User logout',
+        description='Blacklist refresh token to logout user',
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'refresh': {'type': 'string', 'description': 'Refresh token to blacklist'}
+                },
+                'required': ['refresh'],
+            }
+        },
+        responses={
+            200: OpenApiResponse(
+                description='Logout successful',
+                examples=[OpenApiExample('Success', value={'message': 'Logout successful'})],
+            ),
+            400: OpenApiResponse(
+                description='Invalid token',
+                examples=[
+                    OpenApiExample(
+                        'Invalid token',
+                        value={'message': 'Logout failed', 'error': 'Token is invalid or expired'},
+                    )
+                ],
+            ),
+        },
+        tags=['Authentication'],
+    ),
+    password_reset=extend_schema(
+        summary='Request password reset',
+        description=(
+            'Generate a password reset token. In DEBUG or when '
+            '`PASSWORD_RESET_DEBUG_EXPOSE_TOKENS` is True, the response also '
+            'includes the `uid`, `token`, and `reset_link` for testing.'
+        ),
+        request=PasswordResetRequestSerializer,
+        responses={
+            200: OpenApiResponse(
+                description='Reset email sent or token generated',
+                examples=[
+                    OpenApiExample(
+                        'Success',
+                        value={
+                            'message': 'If an account exists with this email, a password reset link has been sent.',
+                            'debug': {
+                                'uid': 'MQ',
+                                'token': 'abc123-token',
+                                'reset_link': 'http://localhost:3000/reset-password/MQ/abc123-token/',
+                            },
+                        },
+                    )
+                ],
+            )
+        },
+        tags=['Authentication'],
+    ),
+    password_reset_confirm=extend_schema(
+        summary='Confirm password reset',
+        description='Reset password using token from email',
+        request=PasswordResetConfirmSerializer,
+        responses={
+            200: OpenApiResponse(
+                description='Password reset successful',
+                examples=[
+                    OpenApiExample(
+                        'Success',
+                        value={
+                            'message': 'Password has been reset successfully. You can now login with your new password.'
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Invalid token or validation errors',
+                examples=[
+                    OpenApiExample(
+                        'Invalid token',
+                        value={
+                            'message': 'Password reset failed',
+                            'errors': {'detail': 'Invalid or expired reset token.'},
+                        },
+                    )
+                ],
+            ),
+        },
+        tags=['Authentication'],
+    ),
+    password_change=extend_schema(
+        summary='Change password',
+        description='Change password for authenticated user',
+        request=ChangePasswordSerializer,
+        responses={
+            200: OpenApiResponse(
+                description='Password changed successfully',
+                examples=[
+                    OpenApiExample('Success', value={'message': 'Password changed successfully'})
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Validation errors',
+                examples=[
+                    OpenApiExample(
+                        'Wrong password',
+                        value={
+                            'message': 'Password change failed',
+                            'errors': {'old_password': ['Wrong password.']},
+                        },
+                    )
+                ],
+            ),
+        },
+        tags=['Authentication'],
+    ),
+    me=extend_schema(
+        summary='Get/update current user profile',
+        description="Get or update authenticated user's profile",
+        request=UserProfileSerializer,
+        responses={200: UserProfileSerializer},
+        tags=['Profile'],
+    ),
+)
 class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     """
     Authentication API ViewSet
@@ -82,42 +286,6 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     # USER REGISTRATION
     # ============================================
 
-    @extend_schema(
-        summary='Register new student',
-        description='Create a new student account with email and password',
-        request=UserRegistrationSerializer,
-        responses={
-            201: OpenApiResponse(
-                description='User registered successfully',
-                examples=[
-                    OpenApiExample(
-                        'Success',
-                        value={
-                            'message': 'Registration successful. Please login.',
-                            'user': {
-                                'id': '123e4567-e89b-12d3-a456-426614174000',
-                                'email': 'student@example.com',
-                                'username': 'student123',
-                                'first_name': 'John',
-                                'last_name': 'Doe',
-                                'role': 'student',
-                            },
-                        },
-                    )
-                ],
-            ),
-            400: OpenApiResponse(
-                description='Validation errors',
-                examples=[
-                    OpenApiExample(
-                        'Email exists',
-                        value={'email': ['A user with this email address already exists.']},
-                    ),
-                ],
-            ),
-        },
-        tags=['Authentication'],
-    )
     @action(detail=False, methods=['post'])
     def register(self, request):
         """
@@ -148,46 +316,6 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     # USER LOGIN
     # ============================================
 
-    @extend_schema(
-        summary='User login',
-        description='Authenticate user with email and password, returns JWT tokens',
-        request=UserLoginSerializer,
-        responses={
-            200: OpenApiResponse(
-                description='Login successful',
-                examples=[
-                    OpenApiExample(
-                        'Success',
-                        value={
-                            'message': 'Login successful',
-                            'access_token': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
-                            'refresh_token': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
-                            'user': {
-                                'id': '123e4567-e89b-12d3-a456-426614174000',
-                                'email': 'student@example.com',
-                                'username': 'student123',
-                                'full_name': 'John Doe',
-                                'role': 'student',
-                            },
-                        },
-                    )
-                ],
-            ),
-            400: OpenApiResponse(
-                description='Invalid credentials',
-                examples=[
-                    OpenApiExample(
-                        'Invalid credentials',
-                        value={
-                            'message': 'Login failed',
-                            'errors': {'detail': 'Invalid email or password.'},
-                        },
-                    )
-                ],
-            ),
-        },
-        tags=['Authentication'],
-    )
     @action(detail=False, methods=['post'])
     def login(self, request):
         """
@@ -222,35 +350,6 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     # USER LOGOUT
     # ============================================
 
-    @extend_schema(
-        summary='User logout',
-        description='Blacklist refresh token to logout user',
-        request={
-            'application/json': {
-                'type': 'object',
-                'properties': {
-                    'refresh': {'type': 'string', 'description': 'Refresh token to blacklist'}
-                },
-                'required': ['refresh'],
-            }
-        },
-        responses={
-            200: OpenApiResponse(
-                description='Logout successful',
-                examples=[OpenApiExample('Success', value={'message': 'Logout successful'})],
-            ),
-            400: OpenApiResponse(
-                description='Invalid token',
-                examples=[
-                    OpenApiExample(
-                        'Invalid token',
-                        value={'message': 'Logout failed', 'error': 'Token is invalid or expired'},
-                    )
-                ],
-            ),
-        },
-        tags=['Authentication'],
-    )
     @action(detail=False, methods=['post'])
     def logout(self, request):
         """
@@ -297,34 +396,6 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     # PASSWORD RESET REQUEST
     # ============================================
 
-    @extend_schema(
-        summary='Request password reset',
-        description=(
-            'Generate a password reset token. In DEBUG or when '
-            '`PASSWORD_RESET_DEBUG_EXPOSE_TOKENS` is True, the response also '
-            'includes the `uid`, `token`, and `reset_link` for testing.'
-        ),
-        request=PasswordResetRequestSerializer,
-        responses={
-            200: OpenApiResponse(
-                description='Reset email sent or token generated',
-                examples=[
-                    OpenApiExample(
-                        'Success',
-                        value={
-                            'message': 'If an account exists with this email, a password reset link has been sent.',
-                            'debug': {
-                                'uid': 'MQ',
-                                'token': 'abc123-token',
-                                'reset_link': 'http://localhost:3000/reset-password/MQ/abc123-token/',
-                            },
-                        },
-                    )
-                ],
-            )
-        },
-        tags=['Authentication'],
-    )
     @action(detail=False, methods=['post'], url_path='password-reset')
     def password_reset(self, request):
         """
@@ -393,37 +464,6 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     # PASSWORD RESET CONFIRMATION
     # ============================================
 
-    @extend_schema(
-        summary='Confirm password reset',
-        description='Reset password using token from email',
-        request=PasswordResetConfirmSerializer,
-        responses={
-            200: OpenApiResponse(
-                description='Password reset successful',
-                examples=[
-                    OpenApiExample(
-                        'Success',
-                        value={
-                            'message': 'Password has been reset successfully. You can now login with your new password.'
-                        },
-                    )
-                ],
-            ),
-            400: OpenApiResponse(
-                description='Invalid token or validation errors',
-                examples=[
-                    OpenApiExample(
-                        'Invalid token',
-                        value={
-                            'message': 'Password reset failed',
-                            'errors': {'detail': 'Invalid or expired reset token.'},
-                        },
-                    )
-                ],
-            ),
-        },
-        tags=['Authentication'],
-    )
     @action(detail=False, methods=['post'], url_path='password-reset-confirm')
     def password_reset_confirm(self, request):
         """
@@ -452,32 +492,6 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     # CHANGE PASSWORD (AUTHENTICATED)
     # ============================================
 
-    @extend_schema(
-        summary='Change password',
-        description='Change password for authenticated user',
-        request=ChangePasswordSerializer,
-        responses={
-            200: OpenApiResponse(
-                description='Password changed successfully',
-                examples=[
-                    OpenApiExample('Success', value={'message': 'Password changed successfully'})
-                ],
-            ),
-            400: OpenApiResponse(
-                description='Validation errors',
-                examples=[
-                    OpenApiExample(
-                        'Wrong password',
-                        value={
-                            'message': 'Password change failed',
-                            'errors': {'old_password': ['Wrong password.']},
-                        },
-                    )
-                ],
-            ),
-        },
-        tags=['Authentication'],
-    )
     @action(detail=False, methods=['post'], url_path='password-change')
     def password_change(self, request):
         """
@@ -509,13 +523,6 @@ class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
     # USER PROFILE
     # ============================================
 
-    @extend_schema(
-        summary='Get/update current user profile',
-        description="Get or update authenticated user's profile",
-        request=UserProfileSerializer,
-        responses={200: UserProfileSerializer},
-        tags=['Profile'],
-    )
     @action(detail=False, methods=['get', 'put', 'patch'])
     def me(self, request):
         """

@@ -1,3 +1,3 @@
-from .viewsets import AuthViewSet
+from .views import AuthViewSet
 
 __all__ = ['AuthViewSet']

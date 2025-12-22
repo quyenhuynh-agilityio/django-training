@@ -12,7 +12,7 @@ Architecture:
 
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 
 from django.db.models import BooleanField, Case, Count, F, Q, Value, When
 from django.utils.translation import gettext_lazy as _
@@ -33,6 +33,85 @@ from .serializers import (
 )
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary='List courses',
+        description='Get a paginated list of courses with filtering, search, and ordering. '
+        'Anonymous users see only active courses. Instructors can filter their own courses.',
+        parameters=[
+            OpenApiParameter(
+                name='category', type=str, description='Filter by category UUID', required=False
+            ),
+            OpenApiParameter(
+                name='status',
+                type=str,
+                description='Filter by course status (draft, active, in_progress, completed)',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='search',
+                type=str,
+                description='Search in title, course_code, or description',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='my_courses',
+                type=OpenApiTypes.BOOL,
+                description='(Instructors only) Show only courses I created',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='ordering',
+                type=str,
+                description='Order by: title, created_at, enrolled_count (prefix with - for descending)',
+                required=False,
+            ),
+        ],
+        tags=['Courses'],
+        responses={200: CourseListSerializer(many=True)},
+    ),
+    retrieve=extend_schema(
+        summary='Get course detail',
+        description='Retrieve complete details for a single course including instructor, '
+        'categories, enrollment stats, and media URLs.',
+        tags=['Courses'],
+        responses={200: CourseDetailSerializer},
+    ),
+    create=extend_schema(
+        summary='Create course',
+        description='Create a new course. Only authenticated instructors can create courses. '
+        'The instructor field is automatically set from the authenticated user.',
+        tags=['Courses'],
+        request=CourseWriteSerializer,
+        responses={
+            201: CourseDetailSerializer,
+            400: {'description': 'Validation error'},
+            403: {'description': 'Only instructors can create courses'},
+        },
+    ),
+    update=extend_schema(
+        summary='Update course',
+        description='Update all fields of a course. Only the course instructor or staff can update.',
+        tags=['Courses'],
+        request=CourseWriteSerializer,
+        responses={
+            200: CourseDetailSerializer,
+            400: {'description': 'Validation error'},
+            403: {'description': 'Only course instructor can update'},
+        },
+    ),
+    partial_update=extend_schema(
+        summary='Partial update course',
+        description='Update specific fields of a course. Only the course instructor or staff can update.',
+        tags=['Courses'],
+        request=CourseWriteSerializer,
+        responses={
+            200: CourseDetailSerializer,
+            400: {'description': 'Validation error'},
+            403: {'description': 'Only course instructor can update'},
+        },
+    ),
+)
 class CourseViewSet(viewsets.ModelViewSet):
     """
     Course ViewSet - Full CRUD operations with custom actions.
@@ -370,107 +449,6 @@ class CourseViewSet(viewsets.ModelViewSet):
         # Return all results if pagination is disabled
         serializer = self.get_serializer(enrollments, many=True)
         return self.ok(serializer.data)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    #   S W A G G E R   D O C U M E N T A T I O N
-    # ═══════════════════════════════════════════════════════════════════════════
-
-    @extend_schema(
-        summary='List courses',
-        description='Get a paginated list of courses with filtering, search, and ordering. '
-        'Anonymous users see only active courses. Instructors can filter their own courses.',
-        parameters=[
-            OpenApiParameter(
-                name='category', type=str, description='Filter by category UUID', required=False
-            ),
-            OpenApiParameter(
-                name='status',
-                type=str,
-                description='Filter by course status (draft, active, in_progress, completed)',
-                required=False,
-            ),
-            OpenApiParameter(
-                name='search',
-                type=str,
-                description='Search in title, course_code, or description',
-                required=False,
-            ),
-            OpenApiParameter(
-                name='my_courses',
-                type=OpenApiTypes.BOOL,
-                description='(Instructors only) Show only courses I created',
-                required=False,
-            ),
-            OpenApiParameter(
-                name='ordering',
-                type=str,
-                description='Order by: title, created_at, enrolled_count (prefix with - for descending)',
-                required=False,
-            ),
-        ],
-        tags=['Courses'],
-        responses={200: CourseListSerializer(many=True)},
-    )
-    def list(self, request, *args, **kwargs):
-        """List courses with filters and pagination"""
-        return super().list(request, *args, **kwargs)
-
-    @extend_schema(
-        summary='Get course detail',
-        description='Retrieve complete details for a single course including instructor, '
-        'categories, enrollment stats, and media URLs.',
-        tags=['Courses'],
-        responses={200: CourseDetailSerializer},
-    )
-    def retrieve(self, request, *args, **kwargs):
-        """Get detailed course information"""
-        return super().retrieve(request, *args, **kwargs)
-
-    @extend_schema(
-        summary='Create course',
-        description='Create a new course. Only authenticated instructors can create courses. '
-        'The instructor field is automatically set from the authenticated user.',
-        tags=['Courses'],
-        request=CourseWriteSerializer,
-        responses={
-            201: CourseDetailSerializer,
-            400: {'description': 'Validation error'},
-            403: {'description': 'Only instructors can create courses'},
-        },
-    )
-    def create(self, request, *args, **kwargs):
-        """Create a new course"""
-        return super().create(request, *args, **kwargs)
-
-    @extend_schema(
-        summary='Update course',
-        description='Update all fields of a course. Only the course instructor or staff can update.',
-        tags=['Courses'],
-        request=CourseWriteSerializer,
-        responses={
-            200: CourseDetailSerializer,
-            400: {'description': 'Validation error'},
-            403: {'description': 'Only course instructor can update'},
-        },
-    )
-    def update(self, request, *args, **kwargs):
-        """Full update of a course"""
-        return super().update(request, *args, **kwargs)
-
-    @extend_schema(
-        summary='Partial update course',
-        description='Update specific fields of a course. Only the course instructor or staff can update.',
-        tags=['Courses'],
-        request=CourseWriteSerializer,
-        responses={
-            200: CourseDetailSerializer,
-            400: {'description': 'Validation error'},
-            403: {'description': 'Only course instructor can update'},
-        },
-    )
-    def partial_update(self, request, *args, **kwargs):
-        """Partial update of a course"""
-        return super().partial_update(request, *args, **kwargs)
 
 
 __all__ = ['CourseViewSet']

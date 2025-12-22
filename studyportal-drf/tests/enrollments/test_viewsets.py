@@ -83,7 +83,7 @@ def test_enrollment_leave_action(api_client, create_user, create_enrollment):
 
 def test_enrollment_swagger_fake_view(api_client, create_user):
     """Test that swagger_fake_view returns empty queryset"""
-    from enrollments.api.viewsets import StudentEnrolledCoursesViewSet
+    from enrollments.api.views import StudentEnrolledCoursesViewSet
 
     student = create_user(email='student@example.com', username='student', role='student')
     api_client.force_authenticate(user=student)
