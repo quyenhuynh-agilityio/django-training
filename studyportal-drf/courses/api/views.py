@@ -16,16 +16,17 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema
 
 from django.db.models import BooleanField, Case, Count, F, Q, Value, When
 from django.utils.translation import gettext_lazy as _
-from rest_framework import permissions, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.permissions import AllowAny
 
 from courses.models import Course
 from enrollments.api.serializers import EnrolledStudentSerializer
 from enrollments.models import Enrollment
 
 from .filters import CourseFilter
-from .permissions import IsInstructorOrReadOnly
+from .permissions import IsCourseInstructor, IsInstructor
 from .serializers import (
     CourseDetailSerializer,
     CourseListSerializer,
@@ -145,7 +146,6 @@ class CourseViewSet(viewsets.ModelViewSet):
         - Computed fields (enrolled_count, is_full, can_enroll)
     """
 
-    permission_classes = [IsInstructorOrReadOnly]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = CourseFilter
     search_fields = ['title', 'course_code', 'description']
@@ -158,69 +158,55 @@ class CourseViewSet(viewsets.ModelViewSet):
     # ═══════════════════════════════════════════════════════════════════════════
 
     def get_permissions(self):
-        """Return appropriate permissions based on action"""
+        """
+        Explicit, action-based permission control.
+
+        Rules:
+        - list / retrieve: AllowAny
+        - create: Instructor only
+        - update / partial_update / destroy: Course owner or staff
+        - enrolled_students: Course instructor only
+        """
+
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+
+        if self.action == 'create':
+            return [IsInstructor()]
+
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsCourseInstructor()]
+
         if self.action == 'enrolled_students':
-            return [permissions.IsAuthenticated(), IsInstructorOrReadOnly()]
+            return [IsCourseInstructor()]
+
         return super().get_permissions()
 
     def get_serializer_class(self):
-        """Return appropriate serializer based on action"""
-        serializer_action_classes = {
+        """Return serializer based on action"""
+        return {
             'list': CourseListSerializer,
             'retrieve': CourseDetailSerializer,
             'create': CourseWriteSerializer,
             'update': CourseWriteSerializer,
             'partial_update': CourseWriteSerializer,
             'enrolled_students': EnrolledStudentSerializer,
-        }
-        return serializer_action_classes.get(self.action, CourseWriteSerializer)
+        }.get(self.action, CourseWriteSerializer)
 
     # ═══════════════════════════════════════════════════════════════════════════
-    #   Q U E R Y S E T   B U I L D E R
+    #   Q U E R Y S E T
     # ═══════════════════════════════════════════════════════════════════════════
 
     def get_queryset(self):
-        """
-        Build optimized queryset with role-based filtering.
+        queryset = Course.objects.select_related('instructor').prefetch_related('categories')
 
-        Returns:
-            QuerySet with optimizations and filters applied
-        """
-        queryset = self._build_base_queryset()
-        queryset = self._add_computed_fields_annotations(queryset)
+        queryset = self._add_computed_fields(queryset)
         queryset = self._apply_role_based_filtering(queryset)
-        queryset = self._apply_query_param_filters(queryset)
+
         return queryset.distinct()
 
-    def _build_base_queryset(self):
-        """
-        Create base queryset with query optimizations.
-
-        Optimizations:
-            - select_related('instructor'): Avoids N+1 for instructor
-            - prefetch_related('categories'): Avoids N+1 for categories
-
-        Returns:
-            Base QuerySet with optimizations
-        """
-        return Course.objects.select_related('instructor').prefetch_related('categories')
-
-    def _add_computed_fields_annotations(self, queryset):
-        """
-        Add computed field annotations for list/retrieve actions.
-
-        Annotations (only added for list/retrieve/enrolled_students):
-            - enrolled_count_computed: Count of active enrollments
-            - is_full_computed: Whether course reached max capacity
-            - can_enroll_computed: Whether enrollment is allowed
-
-        Args:
-            queryset: Base QuerySet
-
-        Returns:
-            QuerySet with annotations (or original queryset if not needed)
-        """
-        # Skip annotations for create/update actions to avoid overhead
+    def _add_computed_fields(self, queryset):
+        """Add computed annotations for list/retrieve"""
         if self.action not in ['list', 'retrieve', 'enrolled_students']:
             return queryset
 
@@ -274,36 +260,20 @@ class CourseViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if not user.is_authenticated:
-            # Anonymous users: Only active courses with status=active
             return queryset.filter(is_active=True, status=Course.STATUS_ACTIVE)
 
-        # Authenticated users: All active courses
         queryset = queryset.filter(is_active=True)
 
-        # Instructor viewing own courses (via ?my_courses=true query param)
-        if self._should_filter_my_courses(user):
+        if (
+            getattr(user, 'is_instructor', False)
+            and self.request.query_params.get('my_courses') == 'true'
+        ):
             queryset = queryset.filter(instructor=user)
 
         return queryset
 
-    def _should_filter_my_courses(self, user):
-        """Check if queryset should be filtered to show only instructor's own courses"""
-        return (
-            hasattr(user, 'is_instructor')
-            and user.is_instructor
-            and self.request.query_params.get('my_courses') == 'true'
-        )
-
-    def _apply_query_param_filters(self, queryset):
-        """Apply additional filters from query parameters"""
-        category_id = self.request.query_params.get('category')
-        if category_id:
-            queryset = queryset.filter(categories__id=category_id)
-
-        return queryset
-
     # ═══════════════════════════════════════════════════════════════════════════
-    #   C R U D   O P E R A T I O N S
+    #   C R U D
     # ═══════════════════════════════════════════════════════════════════════════
 
     def perform_create(self, serializer):
@@ -382,8 +352,6 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary='Get enrolled students',
-        description='Get paginated list of all enrolled students in a course. '
-        'Only accessible by the course instructor.',
         tags=['Courses'],
         parameters=[
             OpenApiParameter(
@@ -401,7 +369,6 @@ class CourseViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=['get'],
-        permission_classes=[permissions.IsAuthenticated, IsInstructorOrReadOnly],
         url_path='enrolled-students',
         url_name='enrolled-students',
     )
@@ -424,16 +391,6 @@ class CourseViewSet(viewsets.ModelViewSet):
         """
         course = self.get_object()
 
-        # Verify user is the course instructor
-        if course.instructor != request.user:
-            return self.forbidden(
-                {
-                    'error': _('Only the course instructor can view enrolled students.'),
-                    'code': 'INSTRUCTOR_ONLY',
-                }
-            )
-
-        # Get active enrollments with student details
         enrollments = (
             Enrollment.objects.filter(course=course, is_active=True)
             .select_related('student')

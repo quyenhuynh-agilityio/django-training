@@ -20,7 +20,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-from rest_framework import permissions, viewsets
+from rest_framework import permissions
 from rest_framework.decorators import action
 
 from core.api_views import CommonViewSet
@@ -236,7 +236,7 @@ User = get_user_model()
         tags=['Profile'],
     ),
 )
-class AuthViewSet(CommonViewSet, viewsets.GenericViewSet):
+class AuthViewSet(CommonViewSet):
     """
     Authentication API ViewSet
 

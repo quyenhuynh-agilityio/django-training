@@ -21,10 +21,10 @@ urlpatterns = [
     # ─────────────────────────────────────────────
     # API v1
     # ─────────────────────────────────────────────
-    path('api/v1/users/', include('users.api.urls')),
-    path('api/v1/categories/', include('categories.api.urls')),
-    path('api/v1/courses/', include('courses.api.urls')),
-    path('api/v1/enrollments/', include('enrollments.api.urls')),
+    path('api/v1/', include('users.api.urls')),
+    path('api/v1/', include('categories.api.urls')),
+    path('api/v1/', include('courses.api.urls')),
+    path('api/v1/', include('enrollments.api.urls')),
     # ─────────────────────────────────────────────
     # API Documentation
     # ─────────────────────────────────────────────

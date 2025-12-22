@@ -1,29 +1,35 @@
 from rest_framework import permissions
 
 
-class IsInstructorOrReadOnly(permissions.BasePermission):
+class IsInstructor(permissions.BasePermission):
     """
-    Custom permission:
-    - Read access: everyone
-    - Write access: instructors only
-    - Update/Delete: only course instructor (owner)
+    Permission: Authenticated instructor only.
+
+    Why this exists:
+    - Does NOT hide AllowAny
+    - Does NOT depend on HTTP methods
+    - Used explicitly by ViewSet actions (create, etc.)
     """
 
     def has_permission(self, request, view):
-        # Read permissions for everyone
-        if request.method in permissions.SAFE_METHODS:
-            return True
+        return request.user.is_authenticated and request.user.is_instructor
 
-        # Write permissions only for authenticated instructors
+
+class IsCourseInstructor(permissions.BasePermission):
+    """
+    Permission: Course owner (instructor) or staff.
+
+    Design notes:
+    - View-level check ensures only instructors reach object-level
+    - Object-level check ensures ownership
+    - No SAFE_METHODS logic here (handled by ViewSet)
+    """
+
+    def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.is_instructor
 
     def has_object_permission(self, request, view, obj):
-        # Read permissions for everyone
-        if request.method in permissions.SAFE_METHODS:
-            return True
-
-        # Write permissions only for course instructor
-        return obj.instructor == request.user
+        return obj.instructor == request.user or request.user.is_staff
 
 
 class IsStudent(permissions.BasePermission):
