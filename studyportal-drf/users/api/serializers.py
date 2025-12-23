@@ -17,7 +17,6 @@ from rest_framework.validators import UniqueValidator
 from core.texts import ErrorMessage, HelpText
 from utils.serializers import (
     AuditFieldsBase,
-    CamelCaseSerializerMixin,
     audit_read_only_fields,
 )
 from utils.validators import (
@@ -31,7 +30,6 @@ User = get_user_model()
 
 
 class UserRegistrationSerializer(
-    CamelCaseSerializerMixin,
     serializers.ModelSerializer,
 ):
     """
@@ -144,7 +142,6 @@ class UserRegistrationSerializer(
 
 
 class UserLoginSerializer(
-    CamelCaseSerializerMixin,
     serializers.Serializer,
 ):
     """
@@ -194,7 +191,6 @@ class UserLoginSerializer(
 
 
 class PasswordResetRequestSerializer(
-    CamelCaseSerializerMixin,
     serializers.Serializer,
 ):
     """
@@ -218,7 +214,6 @@ class PasswordResetRequestSerializer(
 
 
 class PasswordResetConfirmSerializer(
-    CamelCaseSerializerMixin,
     serializers.Serializer,
 ):
     """
@@ -272,7 +267,6 @@ class PasswordResetConfirmSerializer(
 
 
 class ChangePasswordSerializer(
-    CamelCaseSerializerMixin,
     serializers.Serializer,
 ):
     """
@@ -334,7 +328,6 @@ class ChangePasswordSerializer(
 
 
 class UserProfileSerializer(
-    CamelCaseSerializerMixin,
     AuditFieldsBase,
     serializers.ModelSerializer,
 ):

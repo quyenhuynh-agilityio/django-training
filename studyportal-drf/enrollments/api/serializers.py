@@ -11,7 +11,7 @@ from rest_framework import serializers
 from core.texts import ErrorMessage, HelpText
 from courses.api.serializers import CourseListSerializer
 from enrollments.models import Enrollment
-from utils.serializers import AuditFieldsBase, CamelCaseSerializerMixin, audit_read_only_fields
+from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
 # ───────────────────────────────────────────────────────────────
 # Base Serializer
@@ -19,7 +19,6 @@ from utils.serializers import AuditFieldsBase, CamelCaseSerializerMixin, audit_r
 
 
 class EnrollmentBaseSerializer(
-    CamelCaseSerializerMixin,
     AuditFieldsBase,
     serializers.ModelSerializer,
 ):
@@ -80,7 +79,7 @@ class EnrolledStudentSerializer(EnrollmentBaseSerializer):
 # ───────────────────────────────────────────────────────────────
 
 
-class EnrollmentCreateSerializer(CamelCaseSerializerMixin, serializers.Serializer):
+class EnrollmentCreateSerializer(serializers.Serializer):
     """
     Create serializer for new student enrollments.
     Uses write_only course_id, returns full EnrollmentSerializer.

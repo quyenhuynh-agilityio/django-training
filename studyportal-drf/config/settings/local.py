@@ -28,7 +28,7 @@ INTERNAL_IPS = [
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,
     'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
+        'djangorestframework_camel_case.render.CamelCaseJSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
 }

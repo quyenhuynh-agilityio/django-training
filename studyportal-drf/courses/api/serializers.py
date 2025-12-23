@@ -16,14 +16,14 @@ from categories.api.serializers import CategorySerializer
 from categories.models import Category
 from core.texts import ErrorMessage, HelpText
 from courses.models import Course
-from utils.serializers import AuditFieldsBase, CamelCaseSerializerMixin, audit_read_only_fields
+from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
 from .bases import CategoryNamesFieldBase, CourseEnrollmentFieldsBase
 
 User = get_user_model()
 
 
-class InstructorSerializer(CamelCaseSerializerMixin, serializers.ModelSerializer):
+class InstructorSerializer(serializers.ModelSerializer):
     """
     Read-only serializer for instructor information.
 
@@ -38,7 +38,6 @@ class InstructorSerializer(CamelCaseSerializerMixin, serializers.ModelSerializer
 
 
 class CourseListSerializer(
-    CamelCaseSerializerMixin,
     AuditFieldsBase,
     CourseEnrollmentFieldsBase,
     serializers.ModelSerializer,
@@ -81,7 +80,6 @@ class CourseListSerializer(
 
 
 class CourseDetailSerializer(
-    CamelCaseSerializerMixin,
     AuditFieldsBase,
     CourseEnrollmentFieldsBase,
     CategoryNamesFieldBase,
@@ -125,7 +123,7 @@ class CourseDetailSerializer(
         read_only_fields = audit_read_only_fields()
 
 
-class CourseWriteSerializer(CamelCaseSerializerMixin, serializers.ModelSerializer):
+class CourseWriteSerializer(serializers.ModelSerializer):
     """
     Serializer for creating and updating courses.
 

@@ -105,13 +105,15 @@ def test_prevent_disabling_in_progress_with_enrollments(
 
 
 def test_course_detail_serializer_category_names(create_category, create_course):
+    """Test that category names are properly formatted"""
     categories = [create_category(name='Backend'), create_category(name='API')]
     course = create_course()
     course.categories.set(categories)
 
     serializer = CourseDetailSerializer(course)
 
-    assert serializer.data['categoryNames'] == 'API, Backend'
+    # Direct serializer test returns snake_case
+    assert serializer.data['category_names'] == 'API, Backend'
 
 
 def test_course_code_empty_validation():
