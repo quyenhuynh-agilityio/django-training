@@ -22,11 +22,6 @@ SECRET_KEY = secret_key_from_env
 # ==============================
 # Must be explicitly set in .env.production
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
-if not ALLOWED_HOSTS or set(ALLOWED_HOSTS) == {'localhost', '127.0.0.1'}:
-    raise ValueError(
-        'ALLOWED_HOSTS must be set to your production domain(s) in .env.production. '
-        'Example: ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com'
-    )
 
 # ==============================
 # SECURITY SETTINGS

@@ -1,13 +1,9 @@
-"""
-Django settings module.
+# config/settings/__init__.py
+import os
 
-This module is intentionally left empty. Django settings are organized
-in separate files:
-- base.py: Common settings
-- local.py: Development settings (extends base)
-- production.py: Production settings (extends base)
-- test.py: Test settings (extends base)
+DJANGO_ENV = os.getenv('DJANGO_ENV', 'local')
 
-The active settings module is determined by the DJANGO_SETTINGS_MODULE
-environment variable (e.g., 'config.settings.local').
-"""
+if DJANGO_ENV == 'production':
+    from .production import *  # noqa: F403
+else:
+    from .local import *  # noqa: F403

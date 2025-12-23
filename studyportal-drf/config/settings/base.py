@@ -10,41 +10,18 @@ from django.core.exceptions import ImproperlyConfigured
 # ==============================
 # ENVIRONMENT
 # ==============================
-env = environ.Env(DEBUG=(bool, False))
-
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Read environment files (if present)
-# Precedence (highest → lowest):
-# 1) OS environment variables
-# 2) .env.<DJANGO_ENV> or ENV_FILE (if set)
-# 3) .env
-#
-# Examples:
-# - DJANGO_ENV=local      -> reads .env.local
-# - DJANGO_ENV=production -> reads .env.production
-# - ENV_FILE=.env.prod    -> reads that file instead
-explicit_env_file = os.environ.get('ENV_FILE')
-django_env = os.environ.get('DJANGO_ENV')
+# -------------------
+# ENV
+# -------------------
+env = environ.Env(DEBUG=(bool, False))
 
-# If DJANGO_ENV isn't set, infer from DJANGO_SETTINGS_MODULE (set early by manage.py / scripts / WSGI).
-if not django_env:
-    settings_module = os.environ.get('DJANGO_SETTINGS_MODULE', '')
-    inferred = settings_module.split('.')[-1] if settings_module else ''
-    if inferred in {'local', 'production', 'test'}:
-        django_env = inferred
+# Load ONE .env file
+environ.Env.read_env(BASE_DIR / '.env')
 
-candidate_files: list[Path] = []
-if explicit_env_file:
-    candidate_files.append((BASE_DIR / explicit_env_file).resolve())
-elif django_env:
-    candidate_files.append(BASE_DIR / f'.env.{django_env}')
+DJANGO_ENV = env('DJANGO_ENV', default='local')
 
-candidate_files.append(BASE_DIR / '.env')
-
-for path in candidate_files:
-    if path.exists():
-        environ.Env.read_env(path)
 
 SECRET_KEY = env('SECRET_KEY', default=secrets.token_urlsafe(50))
 
