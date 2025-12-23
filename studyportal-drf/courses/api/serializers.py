@@ -16,7 +16,7 @@ from categories.api.serializers import CategorySerializer
 from categories.models import Category
 from core.texts import ErrorMessage, HelpText
 from courses.models import Course
-from utils.serializers import AuditFieldsBase, audit_read_only_fields
+from utils.serializers import get_audit_read_only_fields
 
 from .bases import CategoryNamesFieldBase, CourseEnrollmentFieldsBase
 
@@ -38,7 +38,6 @@ class InstructorSerializer(serializers.ModelSerializer):
 
 
 class CourseListSerializer(
-    AuditFieldsBase,
     CourseEnrollmentFieldsBase,
     serializers.ModelSerializer,
 ):
@@ -76,11 +75,10 @@ class CourseListSerializer(
             'max_students',
             'created_at',
         ]
-        read_only_fields = audit_read_only_fields(include_updated=False)
+        read_only_fields = get_audit_read_only_fields(include_updated=False)
 
 
 class CourseDetailSerializer(
-    AuditFieldsBase,
     CourseEnrollmentFieldsBase,
     CategoryNamesFieldBase,
     serializers.ModelSerializer,
@@ -120,7 +118,7 @@ class CourseDetailSerializer(
             'created_at',
             'updated_at',
         ]
-        read_only_fields = audit_read_only_fields()
+        read_only_fields = get_audit_read_only_fields()
 
 
 class CourseWriteSerializer(serializers.ModelSerializer):

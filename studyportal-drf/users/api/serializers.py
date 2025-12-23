@@ -16,8 +16,7 @@ from rest_framework.validators import UniqueValidator
 
 from core.texts import ErrorMessage, HelpText
 from utils.serializers import (
-    AuditFieldsBase,
-    audit_read_only_fields,
+    get_audit_read_only_fields,
 )
 from utils.validators import (
     normalize_email,
@@ -328,7 +327,6 @@ class ChangePasswordSerializer(
 
 
 class UserProfileSerializer(
-    AuditFieldsBase,
     serializers.ModelSerializer,
 ):
     """
@@ -353,7 +351,7 @@ class UserProfileSerializer(
             'date_joined',
             'created_at',
         ]
-        read_only_fields = audit_read_only_fields(
+        read_only_fields = get_audit_read_only_fields(
             'email',
             'username',
             'role',

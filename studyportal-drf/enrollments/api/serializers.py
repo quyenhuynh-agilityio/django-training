@@ -11,7 +11,7 @@ from rest_framework import serializers
 from core.texts import ErrorMessage, HelpText
 from courses.api.serializers import CourseListSerializer
 from enrollments.models import Enrollment
-from utils.serializers import AuditFieldsBase, audit_read_only_fields
+from utils.serializers import get_audit_read_only_fields
 
 # ───────────────────────────────────────────────────────────────
 # Base Serializer
@@ -19,7 +19,6 @@ from utils.serializers import AuditFieldsBase, audit_read_only_fields
 
 
 class EnrollmentBaseSerializer(
-    AuditFieldsBase,
     serializers.ModelSerializer,
 ):
     """
@@ -42,7 +41,7 @@ class EnrollmentBaseSerializer(
             'created_at',
             'updated_at',
         ]
-        read_only_fields = audit_read_only_fields('student')
+        read_only_fields = get_audit_read_only_fields('student')
 
 
 # ───────────────────────────────────────────────────────────────
