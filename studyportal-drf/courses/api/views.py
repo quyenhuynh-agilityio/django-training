@@ -21,6 +21,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny
 
+from core.api_views import CommonViewSet
 from courses.models import Course
 from enrollments.api.serializers import EnrolledStudentSerializer
 from enrollments.models import Enrollment
@@ -113,7 +114,7 @@ from .serializers import (
         },
     ),
 )
-class CourseViewSet(viewsets.ModelViewSet):
+class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     """
     Course ViewSet - Full CRUD operations with custom actions.
 
@@ -260,7 +261,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if not user.is_authenticated:
-            return queryset.filter(is_active=True, status=Course.STATUS_ACTIVE)
+            return queryset.filter(is_active=True)
 
         queryset = queryset.filter(is_active=True)
 
