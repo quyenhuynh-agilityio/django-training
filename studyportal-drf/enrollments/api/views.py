@@ -13,8 +13,8 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 
 from core.api_views import CommonViewSet
+from core.permissions import IsStudent
 from core.texts import SuccessMessage
-from courses.api.permissions import IsStudent
 from enrollments.models import Enrollment
 
 from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer

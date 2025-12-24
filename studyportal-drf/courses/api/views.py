@@ -21,6 +21,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny
 
 from core.api_views import CommonViewSet
+from core.permissions import IsCourseInstructor, IsInstructor
 from core.texts import ErrorMessage, SuccessMessage
 from courses.models import Course
 from enrollments.api.serializers import EnrolledStudentSerializer
@@ -28,7 +29,6 @@ from enrollments.models import Enrollment
 from utils.permissions import permissions_for_action
 
 from .filters import CourseFilter
-from .permissions import IsCourseInstructor, IsInstructor
 from .serializers import (
     CourseDetailSerializer,
     CourseListSerializer,

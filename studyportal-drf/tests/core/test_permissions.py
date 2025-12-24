@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
-from courses.api.permissions import IsCourseInstructor, IsInstructor, IsStudent
+from core.permissions import IsCourseInstructor, IsInstructor, IsStudent
 
 User = get_user_model()
 
@@ -17,9 +17,9 @@ class IsInstructorPermissionTest(TestCase):
         self.permission = IsInstructor()
         self.view = Mock()
 
-    def test_authenticated_instructor_has_permission(self):
-        """Authenticated instructor should have permission"""
-        user = Mock(is_authenticated=True, is_instructor=True)
+    def test_authenticated_active_instructor_has_permission(self):
+        """Authenticated, active instructor should have permission"""
+        user = Mock(is_authenticated=True, is_instructor=True, is_active=True)
         request = self.factory.get('/')
         request.user = user
 
@@ -27,7 +27,15 @@ class IsInstructorPermissionTest(TestCase):
 
     def test_authenticated_non_instructor_denied(self):
         """Authenticated non-instructor should be denied"""
-        user = Mock(is_authenticated=True, is_instructor=False)
+        user = Mock(is_authenticated=True, is_instructor=False, is_active=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
+
+    def test_inactive_instructor_denied(self):
+        """Inactive instructor should be denied"""
+        user = Mock(is_authenticated=True, is_instructor=True, is_active=False)
         request = self.factory.get('/')
         request.user = user
 
@@ -58,9 +66,9 @@ class IsCourseInstructorPermissionTest(TestCase):
         self.permission = IsCourseInstructor()
         self.view = Mock()
 
-    def test_view_level_authenticated_instructor_has_permission(self):
-        """Authenticated instructor should pass view-level check"""
-        user = Mock(is_authenticated=True, is_instructor=True)
+    def test_view_level_authenticated_active_instructor_has_permission(self):
+        """Authenticated, active instructor should pass view-level check"""
+        user = Mock(is_authenticated=True, is_instructor=True, is_active=True)
         request = self.factory.get('/')
         request.user = user
 
@@ -68,7 +76,15 @@ class IsCourseInstructorPermissionTest(TestCase):
 
     def test_view_level_authenticated_non_instructor_denied(self):
         """Authenticated non-instructor should fail view-level check"""
-        user = Mock(is_authenticated=True, is_instructor=False)
+        user = Mock(is_authenticated=True, is_instructor=False, is_active=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
+
+    def test_view_level_inactive_instructor_denied(self):
+        """Inactive instructor should fail view-level check"""
+        user = Mock(is_authenticated=True, is_instructor=True, is_active=False)
         request = self.factory.get('/')
         request.user = user
 
@@ -134,9 +150,9 @@ class IsStudentPermissionTest(TestCase):
         self.permission = IsStudent()
         self.view = Mock()
 
-    def test_authenticated_student_has_permission(self):
-        """Authenticated student should have permission"""
-        user = Mock(is_authenticated=True, is_student=True)
+    def test_authenticated_active_student_has_permission(self):
+        """Authenticated, active student should have permission"""
+        user = Mock(is_authenticated=True, is_student=True, is_active=True)
         request = self.factory.get('/')
         request.user = user
 
@@ -144,7 +160,15 @@ class IsStudentPermissionTest(TestCase):
 
     def test_authenticated_non_student_denied(self):
         """Authenticated non-student should be denied"""
-        user = Mock(is_authenticated=True, is_student=False)
+        user = Mock(is_authenticated=True, is_student=False, is_active=True)
+        request = self.factory.get('/')
+        request.user = user
+
+        self.assertFalse(self.permission.has_permission(request, self.view))
+
+    def test_inactive_student_denied(self):
+        """Inactive student should be denied"""
+        user = Mock(is_authenticated=True, is_student=True, is_active=False)
         request = self.factory.get('/')
         request.user = user
 

@@ -96,11 +96,6 @@ class CourseDetailSerializer(
 
     categories = CategorySerializer(many=True, read_only=True)
     instructor = InstructorSerializer(read_only=True)
-    # Backwards-compatible camelCase field expected by some API clients/tests
-    category_names = serializers.SerializerMethodField()
-
-    def get_category_names(self, obj):
-        return [c.name for c in obj.categories.all()]
 
     class Meta:
         model = Course
@@ -111,7 +106,6 @@ class CourseDetailSerializer(
             'description',
             'categories',
             'category_names',
-            'categoryNames',
             'instructor',
             'video_url',
             'image_url',
