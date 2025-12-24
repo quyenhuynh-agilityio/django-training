@@ -25,6 +25,7 @@ from core.api_views import CommonViewSet
 from courses.models import Course
 from enrollments.api.serializers import EnrolledStudentSerializer
 from enrollments.models import Enrollment
+from utils.permissions import permissions_for_action
 
 from .filters import CourseFilter
 from .permissions import IsCourseInstructor, IsInstructor
@@ -157,31 +158,33 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     # ═══════════════════════════════════════════════════════════════════════════
     #   P E R M I S S I O N S  &  S E R I A L I Z E R S
     # ═══════════════════════════════════════════════════════════════════════════
+    """
+    Course API.
+
+    Permission rules:
+    - list / retrieve → public
+    - create → instructor only
+    - update / partial_update / destroy → course instructor
+    - enrolled_students → course instructor
+    """
+    permission_classes = [AllowAny]
+
+    permission_classes_map = {
+        'list': [AllowAny],
+        'retrieve': [AllowAny],
+        'create': [IsInstructor],
+        'update': [IsCourseInstructor],
+        'partial_update': [IsCourseInstructor],
+        'destroy': [IsCourseInstructor],
+        'enrolled_students': [IsCourseInstructor],
+    }
 
     def get_permissions(self):
-        """
-        Explicit, action-based permission control.
-
-        Rules:
-        - list / retrieve: AllowAny
-        - create: Instructor only
-        - update / partial_update / destroy: Course owner or staff
-        - enrolled_students: Course instructor only
-        """
-
-        if self.action in ['list', 'retrieve']:
-            return [AllowAny()]
-
-        if self.action == 'create':
-            return [IsInstructor()]
-
-        if self.action in ['update', 'partial_update', 'destroy']:
-            return [IsCourseInstructor()]
-
-        if self.action == 'enrolled_students':
-            return [IsCourseInstructor()]
-
-        return super().get_permissions()
+        return permissions_for_action(
+            action=self.action,
+            permission_classes_map=self.permission_classes_map,
+            default_permissions=self.permission_classes,
+        )
 
     def get_serializer_class(self):
         """Return serializer based on action"""

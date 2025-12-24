@@ -14,10 +14,10 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.texts import ErrorMessage, HelpText
-from utils.serializers import (
+from core.serializers import (
     get_audit_read_only_fields,
 )
+from core.texts import ErrorMessage, HelpText
 from utils.validators import (
     normalize_email,
     validate_name,

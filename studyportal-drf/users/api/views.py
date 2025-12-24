@@ -23,6 +23,7 @@ from rest_framework import permissions
 from rest_framework.decorators import action
 
 from core.api_views import CommonViewSet
+from utils.permissions import permissions_for_action
 
 from .serializers import (
     ChangePasswordSerializer,
@@ -73,14 +74,35 @@ class AuthViewSet(CommonViewSet):
         """Return appropriate serializer for each action"""
         return self.serializer_action_classes.get(self.action, UserRegistrationSerializer)
 
+    """
+    Authentication API.
+
+    Public:
+    - register
+    - login
+    - password_reset
+    - password_reset_confirm
+
+    Protected:
+    - logout
+    - password_change
+    - me
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    permission_classes_map = {
+        'logout': [permissions.IsAuthenticated],
+        'password_change': [permissions.IsAuthenticated],
+        'me': [permissions.IsAuthenticated],
+    }
+
     def get_permissions(self):
-        """
-        Public endpoints: register, login, password_reset, password_reset_confirm
-        Protected endpoints: logout, password_change, me
-        """
-        if self.action in ['logout', 'password_change', 'me']:
-            return [permissions.IsAuthenticated()]
-        return [permissions.AllowAny()]
+        return permissions_for_action(
+            action=self.action,
+            permission_classes_map=self.permission_classes_map,
+            default_permissions=self.permission_classes,
+        )
 
     # ============================================
     # USER REGISTRATION

@@ -14,9 +14,9 @@ from rest_framework import serializers
 
 from categories.api.serializers import CategorySerializer
 from categories.models import Category
+from core.serializers import get_audit_read_only_fields
 from core.texts import ErrorMessage, HelpText
 from courses.models import Course
-from utils.serializers import get_audit_read_only_fields
 
 from .bases import CategoryNamesFieldBase, CourseEnrollmentFieldsBase
 

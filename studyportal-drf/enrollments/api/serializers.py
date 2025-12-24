@@ -8,10 +8,10 @@ Structure:
 from django.db import transaction
 from rest_framework import serializers
 
+from core.serializers import get_audit_read_only_fields
 from core.texts import ErrorMessage, HelpText
 from courses.api.serializers import CourseListSerializer
 from enrollments.models import Enrollment
-from utils.serializers import get_audit_read_only_fields
 
 # ───────────────────────────────────────────────────────────────
 # Base Serializer
