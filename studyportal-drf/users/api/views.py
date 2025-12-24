@@ -24,7 +24,6 @@ from rest_framework.decorators import action
 
 from core.api_views import CommonViewSet
 from core.texts import ErrorMessage, SuccessMessage
-from utils.permissions import permissions_for_action
 
 from .serializers import (
     ChangePasswordSerializer,
@@ -40,21 +39,26 @@ User = get_user_model()
 
 class AuthViewSet(CommonViewSet):
     """
-    Authentication API ViewSet
+    Authentication and User Profile API
 
-    All endpoints are custom actions - no default CRUD operations.
-    Inherits from CommonViewSet for consistent response formatting.
+    Provides endpoints for user registration, authentication, password management,
+    and profile operations. Uses JWT (JSON Web Tokens) for authentication.
 
-    Routes:
-    - POST   /auth/register/              -> register()
-    - POST   /auth/login/                 -> login()
-    - POST   /auth/logout/                -> logout()
-    - POST   /auth/password-reset/        -> password_reset()
-    - POST   /auth/password-reset-confirm/ -> password_reset_confirm()
-    - POST   /auth/password-change/       -> password_change()
-    - GET    /auth/me/                    -> me()
-    - PUT    /auth/me/                    -> me()
-    - PATCH  /auth/me/                    -> me()
+    **Authentication Endpoints:**
+    - Register: Create new user account
+    - Login: Authenticate and receive JWT tokens
+    - Logout: Invalidate refresh token
+    - Password Reset: Request and confirm password resets
+    - Password Change: Change password for authenticated users
+
+    **Profile Endpoints:**
+    - Me: View and update user profile
+
+    **Token Usage:**
+    For protected endpoints, include the access token in the Authorization header:
+    ```
+    Authorization: Bearer <your_access_token>
+    ```
     """
 
     queryset = User.objects.all()
@@ -75,49 +79,39 @@ class AuthViewSet(CommonViewSet):
         """Return appropriate serializer for each action"""
         return self.serializer_action_classes.get(self.action, UserRegistrationSerializer)
 
-    """
-    Authentication API.
-
-    Public:
-    - register
-    - login
-    - password_reset
-    - password_reset_confirm
-
-    Protected:
-    - logout
-    - password_change
-    - me
-    """
-
-    permission_classes = [permissions.AllowAny]
-
-    permission_classes_map = {
-        'logout': [permissions.IsAuthenticated],
-        'password_change': [permissions.IsAuthenticated],
-        'me': [permissions.IsAuthenticated],
-    }
-
     def get_permissions(self):
-        return permissions_for_action(
-            action=self.action,
-            permission_classes_map=self.permission_classes_map,
-            default_permissions=self.permission_classes,
-        )
+        """
+        Public endpoints: register, login, password_reset, password_reset_confirm
+        Protected endpoints: logout, password_change, me
+        """
+        if self.action in ['logout', 'password_change', 'me']:
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
 
     # ============================================
     # USER REGISTRATION
     # ============================================
+
     @extend_schema(
-        summary='Register new student',
-        description='Create a new student account with email and password',
+        summary='Register a new user account',
+        description="""
+        Create a new user account with email and password.
+
+        **Registration Flow:**
+        1. Submit email, password, and user details
+        2. System validates the data and creates account
+        3. User can immediately login with credentials
+
+        **Note:** Email addresses must be unique across the system.
+        """,
         request=UserRegistrationSerializer,
         responses={
             201: OpenApiResponse(
-                description='User registered successfully',
+                response=UserRegistrationSerializer,
+                description='User account created successfully',
                 examples=[
                     OpenApiExample(
-                        'Success',
+                        name='Successful Registration',
                         value={
                             'message': 'Registration successful. Please login.',
                             'user': {
@@ -133,11 +127,26 @@ class AuthViewSet(CommonViewSet):
                 ],
             ),
             400: OpenApiResponse(
-                description='Validation errors',
+                description='Bad Request - Validation failed',
                 examples=[
                     OpenApiExample(
-                        'Email exists',
+                        name='Email Already Exists',
                         value={'email': ['A user with this email address already exists.']},
+                    ),
+                    OpenApiExample(
+                        name='Weak Password',
+                        value={
+                            'password': [
+                                'This password is too short. It must contain at least 8 characters.'
+                            ]
+                        },
+                    ),
+                    OpenApiExample(
+                        name='Missing Required Fields',
+                        value={
+                            'email': ['This field is required.'],
+                            'password': ['This field is required.'],
+                        },
                     ),
                 ],
             ),
@@ -156,37 +165,46 @@ class AuthViewSet(CommonViewSet):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
+        # Use serializer for consistent response formatting
+        user_data = UserProfileSerializer(user).data
+
         return self.created(
             {
-                'message': SuccessMessage.REGISTRATION_SUCCESS,
-                'user': {
-                    'id': str(user.id),
-                    'email': user.email,
-                    'username': user.username,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'role': user.role,
-                },
+                'message': 'Registration successful. Please login.',
+                'user': user_data,
             }
         )
 
     # ============================================
     # USER LOGIN
     # ============================================
+
     @extend_schema(
-        summary='User login',
-        description='Authenticate user with email and password, returns JWT tokens',
+        summary='Login to your account',
+        description="""
+        Authenticate with email and password to receive JWT tokens.
+
+        **Authentication Flow:**
+        1. Submit email and password
+        2. Receive access token (short-lived) and refresh token (long-lived)
+        3. Include access token in `Authorization: Bearer <token>` header for protected endpoints
+        4. Use refresh token to get new access token when expired
+
+        **Token Lifetimes:**
+        - Access Token: Valid for 1 hour
+        - Refresh Token: Valid for 7 days
+        """,
         request=UserLoginSerializer,
         responses={
             200: OpenApiResponse(
-                description='Login successful',
+                description='Login successful - Returns JWT tokens',
                 examples=[
                     OpenApiExample(
-                        'Success',
+                        name='Successful Login',
                         value={
                             'message': 'Login successful',
-                            'access_token': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
-                            'refresh_token': 'eyJ0eXAiOiJKV1QiLCJhbGc...',
+                            'access_token': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...',
+                            'refresh_token': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...',
                             'user': {
                                 'id': '123e4567-e89b-12d3-a456-426614174000',
                                 'email': 'student@example.com',
@@ -199,14 +217,30 @@ class AuthViewSet(CommonViewSet):
                 ],
             ),
             400: OpenApiResponse(
-                description='Invalid credentials',
+                description='Bad Request - Invalid credentials',
                 examples=[
                     OpenApiExample(
-                        'Invalid credentials',
+                        name='Invalid Credentials',
                         value={
                             'message': 'Login failed',
                             'errors': {'detail': 'Invalid email or password.'},
                         },
+                    ),
+                    OpenApiExample(
+                        name='Missing Fields',
+                        value={
+                            'email': ['This field is required.'],
+                            'password': ['This field is required.'],
+                        },
+                    ),
+                ],
+            ),
+            401: OpenApiResponse(
+                description='Unauthorized - Account inactive',
+                examples=[
+                    OpenApiExample(
+                        name='Inactive Account',
+                        value={'detail': 'User account is disabled.'},
                     )
                 ],
             ),
@@ -228,32 +262,44 @@ class AuthViewSet(CommonViewSet):
         # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
 
+        # Use serializer for consistent user data formatting
+        user_data = UserProfileSerializer(user).data
+
         return self.ok(
             {
-                'message': SuccessMessage.LOGIN_SUCCESS,
+                'message': 'Login successful',
                 'access_token': str(refresh.access_token),
                 'refresh_token': str(refresh),
-                'user': {
-                    'id': str(user.id),
-                    'email': user.email,
-                    'username': user.username,
-                    'full_name': user.full_name,
-                    'role': user.role,
-                },
+                'user': user_data,
             }
         )
 
     # ============================================
     # USER LOGOUT
     # ============================================
+
     @extend_schema(
-        summary='User logout',
-        description='Blacklist refresh token to logout user',
+        summary='Logout from your account',
+        description="""
+        Invalidate the refresh token to logout.
+
+        **Logout Behavior:**
+        - Refresh token is blacklisted and cannot be reused
+        - Access token remains valid until natural expiration
+        - For complete security, client should also delete stored tokens
+
+        **Security Note:** Requires `rest_framework_simplejwt.token_blacklist`
+        in INSTALLED_APPS for token blacklisting.
+        """,
         request={
             'application/json': {
                 'type': 'object',
                 'properties': {
-                    'refresh': {'type': 'string', 'description': 'Refresh token to blacklist'}
+                    'refresh': {
+                        'type': 'string',
+                        'description': 'The refresh token to blacklist',
+                        'example': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...',
+                    }
                 },
                 'required': ['refresh'],
             }
@@ -261,14 +307,39 @@ class AuthViewSet(CommonViewSet):
         responses={
             200: OpenApiResponse(
                 description='Logout successful',
-                examples=[OpenApiExample('Success', value={'message': 'Logout successful'})],
+                examples=[
+                    OpenApiExample(name='Success', value={'message': 'Logout successful'}),
+                    OpenApiExample(
+                        name='Success (No Blacklist)',
+                        value={
+                            'message': 'Logout successful',
+                            'warning': 'Token blacklist not enabled. Add rest_framework_simplejwt.token_blacklist to INSTALLED_APPS.',
+                        },
+                    ),
+                ],
             ),
             400: OpenApiResponse(
-                description='Invalid token',
+                description='Bad Request - Invalid or missing token',
                 examples=[
                     OpenApiExample(
-                        'Invalid token',
+                        name='Invalid Token',
                         value={'message': 'Logout failed', 'error': 'Token is invalid or expired'},
+                    ),
+                    OpenApiExample(
+                        name='Missing Token',
+                        value={
+                            'message': 'Logout failed',
+                            'code': {'refresh': ['This field is required.']},
+                        },
+                    ),
+                ],
+            ),
+            401: OpenApiResponse(
+                description='Unauthorized - Authentication required',
+                examples=[
+                    OpenApiExample(
+                        name='Not Authenticated',
+                        value={'detail': 'Authentication credentials were not provided.'},
                     )
                 ],
             ),
@@ -289,26 +360,19 @@ class AuthViewSet(CommonViewSet):
 
         if not refresh_token:
             return self.bad_request(
-                message=ErrorMessage.LOGOUT_FAILED,
-                code={'refresh': ['This field is required.']},
+                message='Logout failed', code={'refresh': ['This field is required.']}
             )
 
         try:
             token = RefreshToken(refresh_token)
-        except TokenError:
-            return self.bad_request(
-                message=ErrorMessage.LOGOUT_FAILED,
-                code={'refresh': ['Token is invalid or expired']},
-            )
-
-        try:
             token.blacklist()
+            return self.ok({'message': SuccessMessage.LOGOUT_SUCCESS})
+
         except AttributeError:
             # Blacklist app not installed - just return success
-            # In production, you should install token_blacklist
             return self.ok(
                 {
-                    'message': SuccessMessage.LOGOUT_SUCCESS,
+                    'message': 'Logout successful',
                     'warning': 'Token blacklist not enabled. Add rest_framework_simplejwt.token_blacklist to INSTALLED_APPS.',
                 }
             )
@@ -318,25 +382,43 @@ class AuthViewSet(CommonViewSet):
                 code={'refresh': ['Token is invalid or expired']},
             )
 
-        return self.ok({'message': SuccessMessage.LOGOUT_SUCCESS})
-
     # ============================================
     # PASSWORD RESET REQUEST
     # ============================================
+
     @extend_schema(
-        summary='Request password reset',
-        description=(
-            'Generate a password reset token. In DEBUG or when '
-            '`PASSWORD_RESET_DEBUG_EXPOSE_TOKENS` is True, the response also '
-            'includes the `uid`, `token`, and `reset_link` for testing.'
-        ),
+        summary='Request a password reset link',
+        description="""
+        Send a password reset link to the user's email address.
+
+        **Reset Flow:**
+        1. Submit email address
+        2. If account exists, reset link is sent to email
+        3. Link contains UID and token valid for 24 hours
+        4. Use link to access password reset confirmation page
+
+        **Security Features:**
+        - Returns success even if email doesn't exist (prevents email enumeration)
+        - Token is single-use and expires after 24 hours
+        - Original password remains valid until reset is completed
+
+        **Development Mode:**
+        When `DEBUG=True` or `PASSWORD_RESET_DEBUG_EXPOSE_TOKENS=True`,
+        the response includes the reset token and link for testing purposes.
+        """,
         request=PasswordResetRequestSerializer,
         responses={
             200: OpenApiResponse(
-                description='Reset email sent or token generated',
+                description='Password reset email sent (or would be sent)',
                 examples=[
                     OpenApiExample(
-                        'Success',
+                        name='Production Response',
+                        value={
+                            'message': 'If an account exists with this email, a password reset link has been sent.',
+                        },
+                    ),
+                    OpenApiExample(
+                        name='Development Response',
                         value={
                             'message': 'If an account exists with this email, a password reset link has been sent.',
                             'debug': {
@@ -345,9 +427,21 @@ class AuthViewSet(CommonViewSet):
                                 'reset_link': 'http://localhost:3000/reset-password/MQ/abc123-token/',
                             },
                         },
+                    ),
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Bad Request - Invalid email format',
+                examples=[
+                    OpenApiExample(
+                        name='Invalid Email',
+                        value={
+                            'message': 'Invalid email format',
+                            'code': {'email': ['Enter a valid email address.']},
+                        },
                     )
                 ],
-            )
+            ),
         },
         tags=['Authentication'],
     )
@@ -402,10 +496,11 @@ class AuthViewSet(CommonViewSet):
                         fail_silently=False,
                     )
                 except Exception as email_error:
+                    # Log error but don't expose to user
                     print(f'Email error: {email_error}')
 
         except User.DoesNotExist:
-            # Don't reveal if email exists
+            # Don't reveal if email exists - security measure
             pass
 
         response_payload = {'message': SuccessMessage.PASSWORD_RESET_EMAIL_SENT}
@@ -418,16 +513,34 @@ class AuthViewSet(CommonViewSet):
     # ============================================
     # PASSWORD RESET CONFIRMATION
     # ============================================
+
     @extend_schema(
-        summary='Confirm password reset',
-        description='Reset password using token from email',
+        summary='Complete password reset with token',
+        description="""
+        Reset password using the token received via email.
+
+        **Reset Confirmation Flow:**
+        1. Extract UID and token from reset link
+        2. Submit new password with UID and token
+        3. Password is updated and user can login with new credentials
+
+        **Token Validation:**
+        - Token must be valid and not expired (24-hour limit)
+        - Token can only be used once
+        - User account must be active
+
+        **After Reset:**
+        - Old password is no longer valid
+        - User can immediately login with new password
+        - All existing sessions remain active (tokens not invalidated)
+        """,
         request=PasswordResetConfirmSerializer,
         responses={
             200: OpenApiResponse(
-                description='Password reset successful',
+                description='Password reset completed successfully',
                 examples=[
                     OpenApiExample(
-                        'Success',
+                        name='Success',
                         value={
                             'message': 'Password has been reset successfully. You can now login with your new password.'
                         },
@@ -435,15 +548,31 @@ class AuthViewSet(CommonViewSet):
                 ],
             ),
             400: OpenApiResponse(
-                description='Invalid token or validation errors',
+                description='Bad Request - Invalid token or validation errors',
                 examples=[
                     OpenApiExample(
-                        'Invalid token',
+                        name='Invalid Token',
                         value={
                             'message': 'Password reset failed',
                             'errors': {'detail': 'Invalid or expired reset token.'},
                         },
-                    )
+                    ),
+                    OpenApiExample(
+                        name='Weak Password',
+                        value={
+                            'new_password': [
+                                'This password is too short. It must contain at least 8 characters.'
+                            ]
+                        },
+                    ),
+                    OpenApiExample(
+                        name='Missing Fields',
+                        value={
+                            'uid': ['This field is required.'],
+                            'token': ['This field is required.'],
+                            'new_password': ['This field is required.'],
+                        },
+                    ),
                 ],
             ),
         },
@@ -463,7 +592,7 @@ class AuthViewSet(CommonViewSet):
         user = serializer.validated_data['user']
         new_password = serializer.validated_data['new_password']
 
-        # Set new password
+        # Set new password (uses Django's password hashing)
         user.set_password(new_password)
         user.save()
 
@@ -472,26 +601,70 @@ class AuthViewSet(CommonViewSet):
     # ============================================
     # CHANGE PASSWORD (AUTHENTICATED)
     # ============================================
+
     @extend_schema(
-        summary='Change password',
-        description='Change password for authenticated user',
+        summary='Change your current password',
+        description="""
+        Change password for the authenticated user.
+
+        **Change Password Flow:**
+        1. Provide current password for verification
+        2. Submit new password
+        3. Password is updated immediately
+
+        **Security Notes:**
+        - Must provide correct old password
+        - User remains logged in (JWT tokens remain valid)
+        - Recommended to logout other sessions after password change
+
+        **Password Requirements:**
+        - Minimum 8 characters
+        - Cannot be entirely numeric
+        - Cannot be too similar to personal information
+        """,
         request=ChangePasswordSerializer,
         responses={
             200: OpenApiResponse(
                 description='Password changed successfully',
                 examples=[
-                    OpenApiExample('Success', value={'message': 'Password changed successfully'})
+                    OpenApiExample(
+                        name='Success', value={'message': 'Password changed successfully'}
+                    )
                 ],
             ),
             400: OpenApiResponse(
-                description='Validation errors',
+                description='Bad Request - Validation errors',
                 examples=[
                     OpenApiExample(
-                        'Wrong password',
+                        name='Wrong Old Password',
                         value={
                             'message': 'Password change failed',
                             'errors': {'old_password': ['Wrong password.']},
                         },
+                    ),
+                    OpenApiExample(
+                        name='Weak New Password',
+                        value={
+                            'new_password': [
+                                'This password is too short. It must contain at least 8 characters.'
+                            ]
+                        },
+                    ),
+                    OpenApiExample(
+                        name='Missing Fields',
+                        value={
+                            'old_password': ['This field is required.'],
+                            'new_password': ['This field is required.'],
+                        },
+                    ),
+                ],
+            ),
+            401: OpenApiResponse(
+                description='Unauthorized - Authentication required',
+                examples=[
+                    OpenApiExample(
+                        name='Not Authenticated',
+                        value={'detail': 'Authentication credentials were not provided.'},
                     )
                 ],
             ),
@@ -520,7 +693,7 @@ class AuthViewSet(CommonViewSet):
                 code={'old_password': ['Wrong password.']},
             )
 
-        # Set new password
+        # Set new password (uses Django's password hashing)
         user.set_password(new_password)
         user.save()
 
@@ -529,12 +702,70 @@ class AuthViewSet(CommonViewSet):
     # ============================================
     # USER PROFILE
     # ============================================
+
     @extend_schema(
-        summary='Get/update current user profile',
-        description="Get or update authenticated user's profile",
+        summary='Get or update your profile',
+        description="""
+        Retrieve or update the authenticated user's profile information.
+
+        **HTTP Methods:**
+        - `GET`: Retrieve current user profile
+        - `PUT`: Full profile update (all fields required)
+        - `PATCH`: Partial profile update (only changed fields)
+
+        **Updatable Fields:**
+        - first_name
+        - last_name
+
+        **Read-Only Fields:**
+        - id
+        - email
+        - username
+        - role
+        - date_joined
+
+        **Note:** To change email or password, use dedicated endpoints.
+        """,
         request=UserProfileSerializer,
-        responses={200: UserProfileSerializer},
-        tags=['Profile'],
+        responses={
+            200: OpenApiResponse(
+                response=UserProfileSerializer,
+                description='Profile retrieved or updated successfully',
+                examples=[
+                    OpenApiExample(
+                        name='Profile Data',
+                        value={
+                            'id': '123e4567-e89b-12d3-a456-426614174000',
+                            'email': 'student@example.com',
+                            'username': 'student123',
+                            'first_name': 'John',
+                            'last_name': 'Doe',
+                            'full_name': 'John Doe',
+                            'role': 'student',
+                            'date_joined': '2024-01-15T10:30:00Z',
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Bad Request - Validation errors',
+                examples=[
+                    OpenApiExample(
+                        name='Invalid Field', value={'first_name': ['This field may not be blank.']}
+                    )
+                ],
+            ),
+            401: OpenApiResponse(
+                description='Unauthorized - Authentication required',
+                examples=[
+                    OpenApiExample(
+                        name='Not Authenticated',
+                        value={'detail': 'Authentication credentials were not provided.'},
+                    )
+                ],
+            ),
+        },
+        tags=['User Profile'],
     )
     @action(detail=False, methods=['get', 'put', 'patch'])
     def me(self, request):
@@ -554,13 +785,15 @@ class AuthViewSet(CommonViewSet):
             serializer = self.get_serializer(user)
             return self.ok(serializer.data)
 
-        # PUT or PATCH
+        # PUT or PATCH - update profile
         serializer = self.get_serializer(
             user, data=request.data, partial=(request.method == 'PATCH')
         )
 
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        # Return updated user data
         return self.ok(serializer.data)
 
 
