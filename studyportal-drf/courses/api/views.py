@@ -15,13 +15,13 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 
 from django.db.models import BooleanField, Case, Count, F, Q, Value, When
-from django.utils.translation import gettext_lazy as _
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny
 
 from core.api_views import CommonViewSet
+from core.texts import ErrorMessage, SuccessMessage
 from courses.models import Course
 from enrollments.api.serializers import EnrolledStudentSerializer
 from enrollments.models import Enrollment
@@ -330,7 +330,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         # 1️⃣ Already deleted → block here (NO exception flow)
         if not course.is_active:
             return self.bad_request(
-                message=_('Course is already deleted.'),
+                message=ErrorMessage.COURSE_ALREADY_DELETED,
                 code='COURSE_ALREADY_DELETED',
             )
 
@@ -343,7 +343,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         if course.status == Course.STATUS_IN_PROGRESS and enrolled > 0:
             return self.bad_request(
-                message=_('Cannot delete a course that is in progress with enrolled students.'),
+                message=ErrorMessage.CANNOT_DELETE_IN_PROGRESS_WITH_STUDENTS,
                 code='COURSE_IN_PROGRESS_WITH_STUDENTS',
             )
 
@@ -352,7 +352,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         return self.ok(
             {
-                'message': _('Course deleted successfully.'),
+                'message': SuccessMessage.COURSE_DELETED_SUCCESSFULLY,
                 'course_id': str(course.id),
                 'course_code': course.course_code,
             }

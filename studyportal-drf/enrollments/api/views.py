@@ -13,6 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 
 from core.api_views import CommonViewSet
+from core.texts import SuccessMessage
 from courses.api.permissions import IsStudent
 from enrollments.models import Enrollment
 
@@ -151,7 +152,7 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
 
         return self.created(
             {
-                'message': 'Successfully enrolled in course',
+                'message': SuccessMessage.ENROLLMENT_ENROLLED_SUCCESS,
                 'data': serializer.data,
             },
         )
@@ -203,7 +204,7 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
 
         return self.ok(
             {
-                'message': 'Successfully left the course',
+                'message': SuccessMessage.ENROLLMENT_LEFT_COURSE_SUCCESS,
                 'data': {'enrollment_id': str(enrollment.id), 'status': enrollment.status},
             },
         )

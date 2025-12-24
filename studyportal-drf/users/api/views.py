@@ -23,6 +23,7 @@ from rest_framework import permissions
 from rest_framework.decorators import action
 
 from core.api_views import CommonViewSet
+from core.texts import ErrorMessage, SuccessMessage
 from utils.permissions import permissions_for_action
 
 from .serializers import (
@@ -157,7 +158,7 @@ class AuthViewSet(CommonViewSet):
 
         return self.created(
             {
-                'message': 'Registration successful. Please login.',
+                'message': SuccessMessage.REGISTRATION_SUCCESS,
                 'user': {
                     'id': str(user.id),
                     'email': user.email,
@@ -229,7 +230,7 @@ class AuthViewSet(CommonViewSet):
 
         return self.ok(
             {
-                'message': 'Login successful',
+                'message': SuccessMessage.LOGIN_SUCCESS,
                 'access_token': str(refresh.access_token),
                 'refresh_token': str(refresh),
                 'user': {
@@ -288,14 +289,16 @@ class AuthViewSet(CommonViewSet):
 
         if not refresh_token:
             return self.bad_request(
-                message='Logout failed', code={'refresh': ['This field is required.']}
+                message=ErrorMessage.LOGOUT_FAILED,
+                code={'refresh': ['This field is required.']},
             )
 
         try:
             token = RefreshToken(refresh_token)
         except TokenError:
             return self.bad_request(
-                message='Logout failed', code={'refresh': ['Token is invalid or expired']}
+                message=ErrorMessage.LOGOUT_FAILED,
+                code={'refresh': ['Token is invalid or expired']},
             )
 
         try:
@@ -305,16 +308,17 @@ class AuthViewSet(CommonViewSet):
             # In production, you should install token_blacklist
             return self.ok(
                 {
-                    'message': 'Logout successful',
+                    'message': SuccessMessage.LOGOUT_SUCCESS,
                     'warning': 'Token blacklist not enabled. Add rest_framework_simplejwt.token_blacklist to INSTALLED_APPS.',
                 }
             )
         except TokenError:
             return self.bad_request(
-                message='Logout failed', code={'refresh': ['Token is invalid or expired']}
+                message=ErrorMessage.LOGOUT_FAILED,
+                code={'refresh': ['Token is invalid or expired']},
             )
 
-        return self.ok({'message': 'Logout successful'})
+        return self.ok({'message': SuccessMessage.LOGOUT_SUCCESS})
 
     # ============================================
     # PASSWORD RESET REQUEST
@@ -359,7 +363,9 @@ class AuthViewSet(CommonViewSet):
         serializer = self.get_serializer(data=request.data)
 
         if not serializer.is_valid():
-            return self.bad_request(message='Invalid email format', code=serializer.errors)
+            return self.bad_request(
+                message=ErrorMessage.INVALID_EMAIL_OR_PASSWORD, code=serializer.errors
+            )
 
         email = serializer.validated_data['email']
         debug_payload = None
@@ -402,9 +408,7 @@ class AuthViewSet(CommonViewSet):
             # Don't reveal if email exists
             pass
 
-        response_payload = {
-            'message': 'If an account exists with this email, a password reset link has been sent.'
-        }
+        response_payload = {'message': SuccessMessage.PASSWORD_RESET_EMAIL_SENT}
 
         if debug_payload:
             response_payload['debug'] = debug_payload
@@ -463,11 +467,7 @@ class AuthViewSet(CommonViewSet):
         user.set_password(new_password)
         user.save()
 
-        return self.ok(
-            {
-                'message': 'Password has been reset successfully. You can now login with your new password.'
-            }
-        )
+        return self.ok({'message': SuccessMessage.PASSWORD_RESET_SUCCESS})
 
     # ============================================
     # CHANGE PASSWORD (AUTHENTICATED)
@@ -516,14 +516,15 @@ class AuthViewSet(CommonViewSet):
         # Verify old password
         if not user.check_password(old_password):
             return self.bad_request(
-                message='Password change failed', code={'old_password': ['Wrong password.']}
+                message=ErrorMessage.OLD_PASSWORD_INCORRECT,
+                code={'old_password': ['Wrong password.']},
             )
 
         # Set new password
         user.set_password(new_password)
         user.save()
 
-        return self.ok({'message': 'Password changed successfully'})
+        return self.ok({'message': SuccessMessage.PASSWORD_CHANGED_SUCCESS})
 
     # ============================================
     # USER PROFILE

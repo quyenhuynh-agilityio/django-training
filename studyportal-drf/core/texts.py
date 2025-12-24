@@ -65,6 +65,7 @@ class ErrorMessage:
     # Generic / common
     PASSWORDS_DO_NOT_MATCH = _('Passwords do not match.')
     USER_ACCOUNT_DISABLED = _('User account is disabled.')
+    LOGOUT_FAILED = 'Logout failed'
 
     # Users / auth
     USERNAME_INVALID_CHARS = _('Username may contain letters, numbers, and underscores only.')
@@ -99,6 +100,9 @@ class ErrorMessage:
         'Cannot disable a course that is in progress with enrolled students.'
     )
     COURSE_ALREADY_DELETED = 'Course is already deleted.'
+    CANNOT_DELETE_IN_PROGRESS_WITH_STUDENTS = _(
+        'Cannot delete a course that is in progress with enrolled students.'
+    )
     INVALID_STATUS_TRANSITION = _(
         'Invalid status transition from "%(from)s" to "%(to)s". '
         'Please follow the proper course workflow.'
@@ -130,3 +134,26 @@ class ErrorMessage:
         'Only courses with "Active" status accept new enrollments.'
     )
     COURSE_REACHED_MAX_CAPACITY = _('This course has reached maximum capacity.')
+
+
+class SuccessMessage:
+    """Non-error message strings used in API responses."""
+
+    # Courses
+    COURSE_DELETED_SUCCESSFULLY = _('Course deleted successfully.')
+
+    # Enrollments
+    ENROLLMENT_ENROLLED_SUCCESS = _('Successfully enrolled in course')
+    ENROLLMENT_LEFT_COURSE_SUCCESS = _('Successfully left the course')
+
+    # Authentication / users
+    REGISTRATION_SUCCESS = _('Registration successful. Please login.')
+    LOGIN_SUCCESS = _('Login successful')
+    LOGOUT_SUCCESS = _('Logout successful')
+    PASSWORD_RESET_EMAIL_SENT = _(
+        'If an account exists with this email, a password reset link has been sent.'
+    )
+    PASSWORD_RESET_SUCCESS = _(
+        'Password has been reset successfully. You can now login with your new password.'
+    )
+    PASSWORD_CHANGED_SUCCESS = _('Password changed successfully')
