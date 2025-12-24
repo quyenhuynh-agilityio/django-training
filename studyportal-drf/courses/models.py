@@ -139,6 +139,14 @@ class Course(models.Model):
         super().save(*args, **kwargs)
 
     def soft_delete(self):
-        """Soft delete the course by setting is_active to False"""
+        """
+        Soft delete the course by setting is_active to False.
+
+        Raises:
+            ValidationError: If the course is already deleted.
+        """
+        if not self.is_active:
+            raise ValidationError(ErrorMessage.COURSE_ALREADY_DELETED)
+
         self.is_active = False
         self.save(update_fields=['is_active', 'updated_at'])

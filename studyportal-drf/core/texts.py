@@ -98,6 +98,7 @@ class ErrorMessage:
     CANNOT_DISABLE_IN_PROGRESS_WITH_STUDENTS = _(
         'Cannot disable a course that is in progress with enrolled students.'
     )
+    COURSE_ALREADY_DELETED = 'Course is already deleted.'
     INVALID_STATUS_TRANSITION = _(
         'Invalid status transition from "%(from)s" to "%(to)s". '
         'Please follow the proper course workflow.'

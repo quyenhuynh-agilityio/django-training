@@ -319,27 +319,35 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         Business Rules:
             - Cannot delete courses in progress with enrolled students
-            - Uses model's soft_delete() method (sets is_active=False)
+            - Cannot delete a course that is already deleted
 
         Returns:
-            200 OK: Course soft-deleted successfully
-            400 Bad Request: Course in progress with students
+            200 OK: Course deleted successfully
+            400 Bad Request: Business rule violation
         """
         course = self.get_object()
 
-        # Check if course can be deleted
-        # Use annotated value if available, otherwise query enrollments
+        # 1️⃣ Already deleted → block here (NO exception flow)
+        if not course.is_active:
+            return self.bad_request(
+                message=_('Course is already deleted.'),
+                code='COURSE_ALREADY_DELETED',
+            )
+
+        # 2️⃣ Check business rule
         enrolled = getattr(
-            course, 'enrolled_count_computed', course.enrollments.filter(is_active=True).count()
+            course,
+            'enrolled_count_computed',
+            course.enrollments.filter(is_active=True).count(),
         )
 
-        if course.is_active and course.status == Course.STATUS_IN_PROGRESS and enrolled > 0:
+        if course.status == Course.STATUS_IN_PROGRESS and enrolled > 0:
             return self.bad_request(
                 message=_('Cannot delete a course that is in progress with enrolled students.'),
                 code='COURSE_IN_PROGRESS_WITH_STUDENTS',
             )
 
-        # Perform soft delete
+        # 3️⃣ Safe to call model (will NOT raise now)
         course.soft_delete()
 
         return self.ok(
