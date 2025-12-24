@@ -56,74 +56,6 @@ from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer
         ],
         tags=['Enrollments'],
     ),
-    enroll=extend_schema(
-        summary='Enroll in course',
-        description='Enroll the authenticated student in a course',
-        request=EnrollmentCreateSerializer,
-        responses={
-            201: EnrollmentSerializer,
-            400: {
-                'description': 'Validation errors',
-                'content': {
-                    'application/json': {
-                        'examples': {
-                            'course_not_found': {
-                                'summary': 'Course not found',
-                                'value': {'course_id': ['Course not found.']},
-                            },
-                            'course_full': {
-                                'summary': 'Course at capacity',
-                                'value': {'course_id': ['Course has reached maximum capacity.']},
-                            },
-                            'already_enrolled': {
-                                'summary': 'Already enrolled',
-                                'value': {
-                                    'course_id': ['You are already enrolled in this course.']
-                                },
-                            },
-                            'course_inactive': {
-                                'summary': 'Course inactive',
-                                'value': {'course_id': ['Cannot enroll in an inactive course.']},
-                            },
-                        }
-                    }
-                },
-            },
-        },
-        tags=['Enrollments'],
-    ),
-    leave=extend_schema(
-        summary='Leave course',
-        description='Unenroll from a specific course (marks enrollment as inactive)',
-        parameters=[
-            OpenApiParameter(
-                name='id',
-                type=OpenApiTypes.UUID,
-                location=OpenApiParameter.PATH,
-                description='Enrollment UUID',
-            ),
-        ],
-        responses={
-            200: {
-                'description': 'Successfully left course',
-                'content': {
-                    'application/json': {
-                        'example': {
-                            'message': 'Successfully left the course',
-                            'data': {
-                                'enrollment_id': '123e4567-e89b-12d3-a456-426614174000',
-                                'status': 'dropped',
-                            },
-                        }
-                    }
-                },
-            },
-            404: {
-                'description': 'Enrollment not found',
-            },
-        },
-        tags=['Enrollments'],
-    ),
 )
 class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
     """
@@ -164,6 +96,42 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
             .prefetch_related('course__categories')
         )
 
+    @extend_schema(
+        summary='Enroll in course',
+        description='Enroll the authenticated student in a course',
+        request=EnrollmentCreateSerializer,
+        responses={
+            201: EnrollmentSerializer,
+            400: {
+                'description': 'Validation errors',
+                'content': {
+                    'application/json': {
+                        'examples': {
+                            'course_not_found': {
+                                'summary': 'Course not found',
+                                'value': {'course_id': ['Course not found.']},
+                            },
+                            'course_full': {
+                                'summary': 'Course at capacity',
+                                'value': {'course_id': ['Course has reached maximum capacity.']},
+                            },
+                            'already_enrolled': {
+                                'summary': 'Already enrolled',
+                                'value': {
+                                    'course_id': ['You are already enrolled in this course.']
+                                },
+                            },
+                            'course_inactive': {
+                                'summary': 'Course inactive',
+                                'value': {'course_id': ['Cannot enroll in an inactive course.']},
+                            },
+                        }
+                    }
+                },
+            },
+        },
+        tags=['Enrollments'],
+    )
     @action(detail=False, methods=['post'])
     def enroll(self, request):
         """
@@ -188,6 +156,38 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
             },
         )
 
+    @extend_schema(
+        summary='Leave course',
+        description='Unenroll from a specific course (marks enrollment as inactive)',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                description='Enrollment UUID',
+            ),
+        ],
+        responses={
+            200: {
+                'description': 'Successfully left course',
+                'content': {
+                    'application/json': {
+                        'example': {
+                            'message': 'Successfully left the course',
+                            'data': {
+                                'enrollment_id': '123e4567-e89b-12d3-a456-426614174000',
+                                'status': 'dropped',
+                            },
+                        }
+                    }
+                },
+            },
+            404: {
+                'description': 'Enrollment not found',
+            },
+        },
+        tags=['Enrollments'],
+    )
     @action(detail=True, methods=['delete'], url_path='leave')
     def leave(self, request, pk=None):
         """
