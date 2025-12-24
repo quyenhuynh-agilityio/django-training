@@ -62,13 +62,12 @@ class AuthViewSet(CommonViewSet):
     """
 
     queryset = User.objects.all()
-    permission_classes = [permissions.AllowAny]  # Default, overridden per action
+    permission_classes = [permissions.AllowAny]
 
-    # Map actions to their serializers
     serializer_action_classes = {
         'register': UserRegistrationSerializer,
         'login': UserLoginSerializer,
-        'logout': None,  # No input serializer needed
+        'logout': None,
         'password_reset': PasswordResetRequestSerializer,
         'password_reset_confirm': PasswordResetConfirmSerializer,
         'password_change': ChangePasswordSerializer,
@@ -163,14 +162,13 @@ class AuthViewSet(CommonViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
 
-        # Use serializer for consistent response formatting
+        user = serializer.save()
         user_data = UserProfileSerializer(user).data
 
         return self.created(
             {
-                'message': 'Registration successful. Please login.',
+                'message': SuccessMessage.REGISTRATION_SUCCESS,
                 'user': user_data,
             }
         )
@@ -267,7 +265,7 @@ class AuthViewSet(CommonViewSet):
 
         return self.ok(
             {
-                'message': 'Login successful',
+                'message': SuccessMessage.LOGIN_SUCCESS,
                 'access_token': str(refresh.access_token),
                 'refresh_token': str(refresh),
                 'user': user_data,
@@ -360,20 +358,21 @@ class AuthViewSet(CommonViewSet):
 
         if not refresh_token:
             return self.bad_request(
-                message='Logout failed', code={'refresh': ['This field is required.']}
+                message=ErrorMessage.LOGOUT_FAILED,
+                code={'refresh': ['This field is required.']},
             )
 
         try:
             token = RefreshToken(refresh_token)
             token.blacklist()
-            return self.ok({'message': SuccessMessage.LOGOUT_SUCCESS})
-
         except AttributeError:
-            # Blacklist app not installed - just return success
             return self.ok(
                 {
-                    'message': 'Logout successful',
-                    'warning': 'Token blacklist not enabled. Add rest_framework_simplejwt.token_blacklist to INSTALLED_APPS.',
+                    'message': SuccessMessage.LOGOUT_SUCCESS,
+                    'warning': (
+                        'Token blacklist not enabled. '
+                        'Add rest_framework_simplejwt.token_blacklist to INSTALLED_APPS.'
+                    ),
                 }
             )
         except TokenError:
@@ -381,6 +380,8 @@ class AuthViewSet(CommonViewSet):
                 message=ErrorMessage.LOGOUT_FAILED,
                 code={'refresh': ['Token is invalid or expired']},
             )
+
+        return self.ok({'message': SuccessMessage.LOGOUT_SUCCESS})
 
     # ============================================
     # PASSWORD RESET REQUEST
@@ -447,68 +448,37 @@ class AuthViewSet(CommonViewSet):
     )
     @action(detail=False, methods=['post'], url_path='password-reset')
     def password_reset(self, request):
-        """
-        Request password reset email
-
-        Sends password reset link to user's email.
-        Token valid for 24 hours.
-        Always returns success to prevent email enumeration.
-        """
         serializer = self.get_serializer(data=request.data)
-
-        if not serializer.is_valid():
-            return self.bad_request(
-                message=ErrorMessage.INVALID_EMAIL_OR_PASSWORD, code=serializer.errors
-            )
-
+        serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
         debug_payload = None
 
         try:
             user = User.objects.get(email=email, is_active=True)
-
-            # Generate reset token
-            token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_link = f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/reset-password/{uid}/{token}/"
 
-            # Build reset link
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-            reset_link = f'{frontend_url}/reset-password/{uid}/{token}/'
+            # Send email
+            if not getattr(settings, 'PASSWORD_RESET_DISABLE_EMAIL', False):
+                send_mail(
+                    'Password Reset Request',
+                    f'Click here to reset your password:\n\n{reset_link}',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                )
 
-            # Debug payload for testing
-            debug_expose = getattr(settings, 'PASSWORD_RESET_DEBUG_EXPOSE_TOKENS', settings.DEBUG)
-            if debug_expose:
+            # Optional debug info
+            if getattr(settings, 'PASSWORD_RESET_DEBUG_EXPOSE_TOKENS', settings.DEBUG):
                 debug_payload = {'uid': uid, 'token': token, 'reset_link': reset_link}
 
-            # Send email (optional in dev)
-            send_email = not getattr(settings, 'PASSWORD_RESET_DISABLE_EMAIL', False)
-            if send_email:
-                try:
-                    send_mail(
-                        subject='Password Reset Request',
-                        message=(
-                            f'Click the link below to reset your password:\n\n'
-                            f'{reset_link}\n\n'
-                            f'This link will expire in 24 hours.'
-                        ),
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[email],
-                        fail_silently=False,
-                    )
-                except Exception as email_error:
-                    # Log error but don't expose to user
-                    print(f'Email error: {email_error}')
-
         except User.DoesNotExist:
-            # Don't reveal if email exists - security measure
-            pass
+            pass  # Always return success (prevent email enumeration)
 
-        response_payload = {'message': SuccessMessage.PASSWORD_RESET_EMAIL_SENT}
-
+        response = {'message': SuccessMessage.PASSWORD_RESET_EMAIL_SENT}
         if debug_payload:
-            response_payload['debug'] = debug_payload
-
-        return self.ok(response_payload)
+            response['debug'] = debug_payload
+        return self.ok(response)
 
     # ============================================
     # PASSWORD RESET CONFIRMATION
@@ -580,21 +550,15 @@ class AuthViewSet(CommonViewSet):
     )
     @action(detail=False, methods=['post'], url_path='password-reset-confirm')
     def password_reset_confirm(self, request):
-        """
-        Confirm password reset with token
-
-        Validates reset token from email and sets new password.
-        Token is single-use and expires after 24 hours.
-        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user = serializer.validated_data['user']
         new_password = serializer.validated_data['new_password']
 
-        # Set new password (uses Django's password hashing)
+        # Set new password
         user.set_password(new_password)
-        user.save()
+        user.save(update_fields=['password'])
 
         return self.ok({'message': SuccessMessage.PASSWORD_RESET_SUCCESS})
 
@@ -683,19 +647,10 @@ class AuthViewSet(CommonViewSet):
         serializer.is_valid(raise_exception=True)
 
         user = request.user
-        old_password = serializer.validated_data['old_password']
         new_password = serializer.validated_data['new_password']
 
-        # Verify old password
-        if not user.check_password(old_password):
-            return self.bad_request(
-                message=ErrorMessage.OLD_PASSWORD_INCORRECT,
-                code={'old_password': ['Wrong password.']},
-            )
-
-        # Set new password (uses Django's password hashing)
         user.set_password(new_password)
-        user.save()
+        user.save(update_fields=['password'])
 
         return self.ok({'message': SuccessMessage.PASSWORD_CHANGED_SUCCESS})
 
@@ -782,18 +737,16 @@ class AuthViewSet(CommonViewSet):
         user = request.user
 
         if request.method == 'GET':
-            serializer = self.get_serializer(user)
-            return self.ok(serializer.data)
+            return self.ok(self.get_serializer(user).data)
 
-        # PUT or PATCH - update profile
         serializer = self.get_serializer(
-            user, data=request.data, partial=(request.method == 'PATCH')
+            user,
+            data=request.data,
+            partial=(request.method == 'PATCH'),
         )
-
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        # Return updated user data
         return self.ok(serializer.data)
 
 
