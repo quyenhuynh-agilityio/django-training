@@ -170,3 +170,143 @@ class EnrollmentCreateSerializer(serializers.Serializer):
     def to_representation(self, instance):
         """Return full enrollment data with course info"""
         return EnrollmentSerializer(instance, context=self.context).data
+
+
+class PaginatedResponseSerializer(serializers.Serializer):
+    """Base serializer for paginated responses"""
+
+    count = serializers.IntegerField(min_value=0, required=True)
+    next = serializers.URLField(required=False, allow_null=True)
+    previous = serializers.URLField(required=False, allow_null=True)
+
+    def validate_count(self, value):
+        if value < 0:
+            raise serializers.ValidationError('Count must be non-negative')
+        return value
+
+
+class EnrollmentListResponseSerializer(PaginatedResponseSerializer):
+    """
+    Response for: GET /enrollments/
+    Returns paginated list of student's enrollments with course details
+    """
+
+    results = EnrollmentSerializer(many=True, required=True)
+
+    def validate_results(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Results must be a list')
+        return value
+
+
+class EnrollmentDetailResponseSerializer(serializers.Serializer):
+    """
+    Response for: GET /enrollments/{id}/
+    Returns complete enrollment details with nested course information
+    """
+
+    # Delegate to EnrollmentSerializer for validation
+    def to_internal_value(self, data):
+        serializer = EnrollmentSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return serializer.validated_data
+
+    def to_representation(self, instance):
+        return EnrollmentSerializer(instance).data
+
+
+class EnrollmentDataSerializer(serializers.Serializer):
+    """Nested enrollment data for enroll response"""
+
+    id = serializers.UUIDField(required=True)
+    course = serializers.DictField(required=True)
+    student = serializers.DictField(required=True)
+    student_name = serializers.CharField(required=True, min_length=1)
+    student_email = serializers.EmailField(required=True)
+    status = serializers.CharField(required=True)
+    is_active = serializers.BooleanField(required=True)
+    created_at = serializers.DateTimeField(required=True)
+    updated_at = serializers.DateTimeField(required=True)
+
+    def validate_status(self, value):
+        valid_statuses = ['active', 'completed', 'dropped']
+        if value not in valid_statuses:
+            raise serializers.ValidationError(
+                f'Invalid status. Must be one of: {", ".join(valid_statuses)}'
+            )
+        return value
+
+    def validate_course(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Course must be a dictionary')
+
+        required_fields = ['id', 'title', 'course_code']
+        missing_fields = [field for field in required_fields if field not in value]
+
+        if missing_fields:
+            raise serializers.ValidationError(
+                f'Course missing required fields: {", ".join(missing_fields)}'
+            )
+        return value
+
+    def validate_student(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Student must be a dictionary')
+
+        # The student field might be just the UUID in some cases
+        if isinstance(value, str):
+            return value
+
+        return value
+
+
+class EnrollmentEnrollResponseSerializer(serializers.Serializer):
+    """
+    Response for: POST /enrollments/enroll/
+    Returns success message and newly created enrollment details
+    """
+
+    message = serializers.CharField(required=True, min_length=1)
+    data = EnrollmentDataSerializer(required=True)
+
+    def validate_message(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('Message cannot be empty')
+        return value
+
+
+class LeaveDataSerializer(serializers.Serializer):
+    """Nested data for leave course response"""
+
+    enrollment_id = serializers.UUIDField(required=True)
+    status = serializers.CharField(required=True)
+
+    def validate_status(self, value):
+        if value != 'dropped':
+            raise serializers.ValidationError('Status must be "dropped" after leaving')
+        return value
+
+
+class EnrollmentLeaveResponseSerializer(serializers.Serializer):
+    """
+    Response for: DELETE /enrollments/{id}/leave/
+    Returns success message and updated enrollment status
+    """
+
+    message = serializers.CharField(required=True, min_length=1)
+    data = LeaveDataSerializer(required=True)
+
+    def validate_message(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('Message cannot be empty')
+        return value
+
+
+__all__ = [
+    'EnrollmentCreateSerializer',
+    'EnrollmentSerializer',
+    'EnrollmentListResponseSerializer',
+    'EnrollmentDetailResponseSerializer',
+    'EnrollmentEnrollResponseSerializer',
+    'EnrollmentLeaveResponseSerializer',
+]

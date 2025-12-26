@@ -30,15 +30,17 @@ from core.api_views import CommonViewSet
 from core.permissions import IsCourseInstructor, IsInstructor
 from core.texts import ErrorMessage, SuccessMessage
 from courses.models import Course
-from enrollments.api.serializers import EnrolledStudentSerializer
 from enrollments.models import Enrollment
 from utils.permissions import permissions_for_action
 
 from .filters import CourseFilter
 from .serializers import (
+    CourseDeleteResponseSerializer,
     CourseDetailSerializer,
     CourseListSerializer,
     CourseWriteSerializer,
+    EnrolledStudentSerializer,
+    EnrolledStudentsResponseSerializer,
 )
 
 
@@ -551,7 +553,6 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
     def get_permissions(self):
         """Get permissions based on action"""
-
         return permissions_for_action(
             action=self.action,
             permission_classes_map=self.permission_classes_map,
@@ -576,10 +577,8 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     def get_queryset(self):
         """Get optimized queryset with computed fields and role-based filtering"""
         queryset = Course.objects.select_related('instructor').prefetch_related('categories')
-
         queryset = self._add_computed_fields(queryset)
         queryset = self._apply_role_based_filtering(queryset)
-
         return queryset.distinct()
 
     def _add_computed_fields(self, queryset):
@@ -642,12 +641,12 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         return queryset
 
     # ═══════════════════════════════════════════════════════════════════════════
-    #   C R U D  O P E R A T I O N S
+    #   C R U D  O P E R A T I O N S  (WITH RESPONSE VALIDATION)
     # ═══════════════════════════════════════════════════════════════════════════
 
     def perform_create(self, serializer):
         """
-        Create course and set instructor from request user.
+        Create course and set instructor from request user
 
         Note:
             The serializer will call model's save() which triggers full_clean()
@@ -750,14 +749,14 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     )
     def destroy(self, request, *args, **kwargs):
         """
-        Soft delete a course.
+        Soft delete a course
 
         Business Rules:
             - Cannot delete courses in progress with enrolled students
             - Cannot delete a course that is already deleted
 
         Returns:
-            200 OK: Course deleted successfully
+            200 OK: Course deleted successfully (with validated response)
             400 Bad Request: Business rule violation
         """
         course = self.get_object()
@@ -785,13 +784,18 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         # Perform soft delete
         course.soft_delete()
 
-        return self.ok(
-            {
-                'message': SuccessMessage.COURSE_DELETED_SUCCESSFULLY,
-                'course_id': str(course.id),
-                'course_code': course.course_code,
-            }
-        )
+        # Prepare response data
+        response_data = {
+            'message': SuccessMessage.COURSE_DELETED_SUCCESSFULLY,
+            'course_id': str(course.id),
+            'course_code': course.course_code,
+        }
+
+        # Validate response structure
+        response_serializer = CourseDeleteResponseSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+
+        return self.ok(response_serializer.data)
 
     # ═══════════════════════════════════════════════════════════════════════════
     #   C U S T O M   A C T I O N S
@@ -844,7 +848,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         ],
         responses={
             200: OpenApiResponse(
-                response=EnrolledStudentSerializer(many=True),
+                response=EnrolledStudentsResponseSerializer,
                 description='List of enrolled students retrieved successfully',
                 examples=[
                     OpenApiExample(
@@ -905,14 +909,14 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     )
     def enrolled_students(self, request, pk=None):
         """
-        Get enrolled students for a course.
+        Get enrolled students for a course
 
         Access Control:
             - Only the course instructor can view enrolled students
             - Returns 403 if user is not the course instructor
 
         Response:
-            Paginated list of enrollments with student details
+            Paginated list of enrollments with student details (validated)
         """
         course = self.get_object()
 
@@ -926,11 +930,19 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         page = self.paginate_queryset(enrollments)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            paginated_response = self.get_paginated_response(serializer.data)
 
-        # Return all results if pagination is disabled
+            # Validate response structure
+            response_serializer = EnrolledStudentsResponseSerializer(data=paginated_response.data)
+            response_serializer.is_valid(raise_exception=True)
+
+            return paginated_response
+
+        # Non-paginated response (fallback)
         serializer = self.get_serializer(enrollments, many=True)
-        return self.ok(serializer.data)
+        response_data = {'results': serializer.data}
+
+        return self.ok(response_data)
 
 
 __all__ = ['CourseViewSet']

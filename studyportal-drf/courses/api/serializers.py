@@ -433,10 +433,104 @@ class CourseWriteSerializer(serializers.ModelSerializer):
 CourseCreateUpdateSerializer = CourseWriteSerializer
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+#   E N R O L L E D   S T U D E N T   S E R I A L I Z E R
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class StudentInfoSerializer(serializers.ModelSerializer):
+    """Nested serializer for student information in enrollments"""
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'username', 'full_name']
+        read_only_fields = fields
+
+
+class EnrolledStudentSerializer(serializers.Serializer):
+    """
+    Display serializer for instructors viewing student enrollments
+    inside a course. Shows enrollment details with student info.
+
+    NOTE: This was moved from enrollments.api.serializers to avoid circular imports.
+    """
+
+    id = serializers.UUIDField(read_only=True)
+    student = StudentInfoSerializer(read_only=True)
+    student_name = serializers.CharField(source='student.full_name', read_only=True)
+    student_email = serializers.EmailField(source='student.email', read_only=True)
+    student_username = serializers.CharField(source='student.username', read_only=True)
+    status = serializers.CharField(read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#   P A G I N A T I O N   B A S E
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class PaginatedResponseSerializer(serializers.Serializer):
+    """Base serializer for paginated responses"""
+
+    count = serializers.IntegerField(min_value=0, required=True)
+    next = serializers.URLField(required=False, allow_null=True)
+    previous = serializers.URLField(required=False, allow_null=True)
+
+    def validate_count(self, value):
+        if value < 0:
+            raise serializers.ValidationError('Count must be non-negative')
+        return value
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#   C O U R S E   R E S P O N S E   S E R I A L I Z E R S
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class CourseDeleteResponseSerializer(serializers.Serializer):
+    """
+    Response for: DELETE /courses/{id}/
+    Returns confirmation message and deleted course info
+    """
+
+    message = serializers.CharField(required=True, min_length=1)
+    course_id = serializers.UUIDField(required=True)
+    course_code = serializers.CharField(required=True, min_length=1, max_length=20)
+
+    def validate_message(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('Message cannot be empty')
+        return value
+
+    def validate_course_code(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('Course code cannot be empty')
+        return value
+
+
+class EnrolledStudentsResponseSerializer(PaginatedResponseSerializer):
+    """
+    Response for: GET /courses/{id}/enrolled-students/
+    Returns paginated list of enrolled students
+    """
+
+    results = EnrolledStudentSerializer(many=True, required=True)
+
+    def validate_results(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Results must be a list')
+        return value
+
+
 __all__ = [
     'InstructorSerializer',
     'CourseListSerializer',
     'CourseDetailSerializer',
     'CourseWriteSerializer',
     'CourseCreateUpdateSerializer',
+    'EnrolledStudentSerializer',
+    'CourseDeleteResponseSerializer',
+    'EnrolledStudentsResponseSerializer',
 ]

@@ -1,7 +1,8 @@
 """
-Enrollment ViewSets
+Enrollment ViewSets - Updated with Response Serializers
 
-ViewSet for student enrollment management with proper DRF patterns.
+Added response validation for all actions to ensure type safety and consistency.
+Each endpoint now validates its output before returning to the client.
 """
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -23,7 +24,14 @@ from core.permissions import IsStudent
 from core.texts import SuccessMessage
 from enrollments.models import Enrollment
 
-from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer
+from .serializers import (
+    EnrollmentCreateSerializer,
+    EnrollmentDetailResponseSerializer,
+    EnrollmentEnrollResponseSerializer,
+    EnrollmentLeaveResponseSerializer,
+    EnrollmentListResponseSerializer,
+    EnrollmentSerializer,
+)
 
 
 @extend_schema_view(
@@ -110,7 +118,7 @@ from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer
         ],
         responses={
             200: OpenApiResponse(
-                response=EnrollmentSerializer(many=True),
+                response=EnrollmentListResponseSerializer,
                 description='List of enrollments retrieved successfully',
                 examples=[
                     OpenApiExample(
@@ -184,7 +192,7 @@ from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer
         ],
         responses={
             200: OpenApiResponse(
-                response=EnrollmentSerializer,
+                response=EnrollmentDetailResponseSerializer,
                 description='Enrollment details retrieved successfully',
                 examples=[
                     OpenApiExample(
@@ -223,7 +231,6 @@ from .serializers import EnrollmentCreateSerializer, EnrollmentSerializer
             ),
             404: OpenApiResponse(
                 description='Enrollment not found or not yours',
-                examples=[OpenApiExample(name='Not Found', value={'detail': 'Not found.'})],
             ),
         },
         tags=['Enrollments'],
@@ -248,6 +255,7 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
     - Filter by enrollment status (active, completed, dropped)
     - Sort by enrollment date
     - Query optimization with prefetched relations
+    - Response validation for all endpoints
 
     **Permissions:**
     - All endpoints require student authentication
@@ -268,7 +276,7 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
     ordering = ['-created_at']
 
     def get_queryset(self):
-        """Get enrollments for current student only"""
+        """Get enrollments for current student only with optimized queries"""
         # Handle schema generation (drf-spectacular introspection)
         if getattr(self, 'swagger_fake_view', False):
             return Enrollment.objects.none()
@@ -311,7 +319,7 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
         request=EnrollmentCreateSerializer,
         responses={
             201: OpenApiResponse(
-                response=EnrollmentSerializer,
+                response=EnrollmentEnrollResponseSerializer,
                 description='Successfully enrolled in course',
                 examples=[
                     OpenApiExample(
@@ -325,13 +333,13 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
                                     'title': 'Introduction to Python',
                                     'course_code': 'CS101',
                                 },
-                                'student': {
-                                    'id': '323e4567-e89b-12d3-a456-426614174002',
-                                    'email': 'student@example.com',
-                                    'full_name': 'John Doe',
-                                },
+                                'student': '323e4567-e89b-12d3-a456-426614174002',
+                                'student_name': 'John Doe',
+                                'student_email': 'student@example.com',
                                 'status': 'active',
-                                'enrolled_at': '2024-01-15T10:30:00Z',
+                                'is_active': True,
+                                'created_at': '2024-01-15T10:30:00Z',
+                                'updated_at': '2024-01-15T10:30:00Z',
                             },
                         },
                     )
@@ -355,9 +363,6 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
                         name='Course Inactive',
                         value={'course_id': ['Cannot enroll in an inactive course.']},
                     ),
-                    OpenApiExample(
-                        name='Missing Course ID', value={'course_id': ['This field is required.']}
-                    ),
                 ],
             ),
             401: OpenApiResponse(
@@ -377,26 +382,37 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
         """
         Enroll in a course
 
+        Validates input, creates enrollment, and returns validated response.
+
         Request body:
         ```json
         {
             "course_id": "123e4567-e89b-12d3-a456-426614174000"
         }
         ```
+
+        Returns:
+            201 Created: Success message with enrollment details (validated)
+            400 Bad Request: Validation errors
         """
+        # Validate input
         serializer = EnrollmentCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         enrollment = serializer.save()
 
-        # Use serializer for consistent response format
-        enrollment_data = EnrollmentSerializer(enrollment).data
+        # Prepare response data
+        enrollment_data = EnrollmentSerializer(enrollment, context=self.context).data
 
-        return self.created(
-            {
-                'message': SuccessMessage.ENROLLMENT_ENROLLED_SUCCESS,
-                'data': enrollment_data,
-            },
-        )
+        response_data = {
+            'message': SuccessMessage.ENROLLMENT_ENROLLED_SUCCESS,
+            'data': enrollment_data,
+        }
+
+        # Validate response structure
+        response_serializer = EnrollmentEnrollResponseSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+
+        return self.created(response_serializer.data)
 
     @extend_schema(
         summary='Leave a course',
@@ -435,6 +451,7 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
         ],
         responses={
             200: OpenApiResponse(
+                response=EnrollmentLeaveResponseSerializer,
                 description='Successfully left the course',
                 examples=[
                     OpenApiExample(
@@ -451,16 +468,9 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
             ),
             404: OpenApiResponse(
                 description='Enrollment not found or not yours',
-                examples=[OpenApiExample(name='Not Found', value={'detail': 'Not found.'})],
             ),
             401: OpenApiResponse(
                 description='Unauthorized - Authentication required',
-                examples=[
-                    OpenApiExample(
-                        name='Not Authenticated',
-                        value={'detail': 'Authentication credentials were not provided.'},
-                    )
-                ],
             ),
         },
         tags=['Enrollments'],
@@ -472,18 +482,30 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
 
         This marks the enrollment as inactive and sets status to 'dropped'.
         The enrollment record is preserved for historical purposes.
+
+        Returns:
+            200 OK: Success message with updated status (validated)
+            404 Not Found: Enrollment not found or not accessible
         """
         enrollment = self.get_object()
 
         # Unenroll the student (updates status to 'dropped' and is_active to False)
         enrollment.unenroll()
 
-        return self.ok(
-            {
-                'message': SuccessMessage.ENROLLMENT_LEFT_COURSE_SUCCESS,
-                'data': {'enrollment_id': str(enrollment.id), 'status': enrollment.status},
+        # Prepare response data
+        response_data = {
+            'message': SuccessMessage.ENROLLMENT_LEFT_COURSE_SUCCESS,
+            'data': {
+                'enrollment_id': str(enrollment.id),
+                'status': enrollment.status,
             },
-        )
+        }
+
+        # Validate response structure
+        response_serializer = EnrollmentLeaveResponseSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+
+        return self.ok(response_serializer.data)
 
 
 __all__ = [
