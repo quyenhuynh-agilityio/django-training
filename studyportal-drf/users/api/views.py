@@ -27,8 +27,15 @@ from core.texts import ErrorMessage, SuccessMessage
 
 from .serializers import (
     ChangePasswordSerializer,
+    LoginResponseSerializer,
+    LogoutSuccessResponseSerializer,
+    LogoutWithWarningResponseSerializer,
+    MeResponseSerializer,
+    MessageOnlyResponseSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    PasswordResetResponseSerializer,
+    RegistrationResponseSerializer,
     UserLoginSerializer,
     UserProfileSerializer,
     UserRegistrationSerializer,
@@ -164,14 +171,15 @@ class AuthViewSet(CommonViewSet):
         serializer.is_valid(raise_exception=True)
 
         user = serializer.save()
-        user_data = UserProfileSerializer(user).data
 
-        return self.created(
+        response_serializer = RegistrationResponseSerializer(
             {
                 'message': SuccessMessage.REGISTRATION_SUCCESS,
-                'user': user_data,
+                'user': user,
             }
         )
+
+        return self.created(response_serializer.data)
 
     # ============================================
     # USER LOGIN
@@ -263,14 +271,19 @@ class AuthViewSet(CommonViewSet):
         # Use serializer for consistent user data formatting
         user_data = UserProfileSerializer(user).data
 
-        return self.ok(
-            {
-                'message': SuccessMessage.LOGIN_SUCCESS,
-                'access_token': str(refresh.access_token),
-                'refresh_token': str(refresh),
-                'user': user_data,
-            }
-        )
+        response_data = {
+            'message': SuccessMessage.LOGIN_SUCCESS,
+            'access_token': str(refresh.access_token),
+            'refresh_token': str(refresh),
+            'user': user_data,  # ← Serialize first!
+        }
+
+        # 4. ✅ Validate OUTPUT
+        response_serializer = LoginResponseSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+
+        # 5. Return validated data
+        return self.ok(response_serializer.data)
 
     # ============================================
     # USER LOGOUT
@@ -365,8 +378,10 @@ class AuthViewSet(CommonViewSet):
         try:
             token = RefreshToken(refresh_token)
             token.blacklist()
+
         except AttributeError:
-            return self.ok(
+            # Token blacklist app not installed
+            response_serializer = LogoutWithWarningResponseSerializer(
                 {
                     'message': SuccessMessage.LOGOUT_SUCCESS,
                     'warning': (
@@ -375,13 +390,20 @@ class AuthViewSet(CommonViewSet):
                     ),
                 }
             )
+            return self.ok(response_serializer.data)
+
         except TokenError:
             return self.bad_request(
                 message=ErrorMessage.LOGOUT_FAILED,
                 code={'refresh': ['Token is invalid or expired']},
             )
 
-        return self.ok({'message': SuccessMessage.LOGOUT_SUCCESS})
+        response_serializer = LogoutSuccessResponseSerializer(
+            {
+                'message': SuccessMessage.LOGOUT_SUCCESS,
+            }
+        )
+        return self.ok(response_serializer.data)
 
     # ============================================
     # PASSWORD RESET REQUEST
@@ -450,6 +472,7 @@ class AuthViewSet(CommonViewSet):
     def password_reset(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
         email = serializer.validated_data['email']
         debug_payload = None
 
@@ -457,7 +480,10 @@ class AuthViewSet(CommonViewSet):
             user = User.objects.get(email=email, is_active=True)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
-            reset_link = f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/reset-password/{uid}/{token}/"
+            reset_link = (
+                f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}"
+                f"/reset-password/{uid}/{token}/"
+            )
 
             # Send email
             if not getattr(settings, 'PASSWORD_RESET_DISABLE_EMAIL', False):
@@ -468,17 +494,25 @@ class AuthViewSet(CommonViewSet):
                     [email],
                 )
 
-            # Optional debug info
+            # Optional debug info (dev only)
             if getattr(settings, 'PASSWORD_RESET_DEBUG_EXPOSE_TOKENS', settings.DEBUG):
-                debug_payload = {'uid': uid, 'token': token, 'reset_link': reset_link}
+                debug_payload = {
+                    'uid': uid,
+                    'token': token,
+                    'reset_link': reset_link,
+                }
 
         except User.DoesNotExist:
-            pass  # Always return success (prevent email enumeration)
+            pass  # Prevent email enumeration
 
-        response = {'message': SuccessMessage.PASSWORD_RESET_EMAIL_SENT}
-        if debug_payload:
-            response['debug'] = debug_payload
-        return self.ok(response)
+        response_serializer = PasswordResetResponseSerializer(
+            {
+                'message': SuccessMessage.PASSWORD_RESET_EMAIL_SENT,
+                **({'debug': debug_payload} if debug_payload else {}),
+            }
+        )
+
+        return self.ok(response_serializer.data)
 
     # ============================================
     # PASSWORD RESET CONFIRMATION
@@ -560,7 +594,13 @@ class AuthViewSet(CommonViewSet):
         user.set_password(new_password)
         user.save(update_fields=['password'])
 
-        return self.ok({'message': SuccessMessage.PASSWORD_RESET_SUCCESS})
+        response_serializer = MessageOnlyResponseSerializer(
+            {
+                'message': SuccessMessage.PASSWORD_RESET_SUCCESS,
+            }
+        )
+
+        return self.ok(response_serializer.data)
 
     # ============================================
     # CHANGE PASSWORD (AUTHENTICATED)
@@ -736,9 +776,12 @@ class AuthViewSet(CommonViewSet):
         """
         user = request.user
 
+        # ---------- GET ----------
         if request.method == 'GET':
-            return self.ok(self.get_serializer(user).data)
+            response_serializer = MeResponseSerializer({'user': self.get_serializer(user).data})
+            return self.ok(response_serializer.data)
 
+        # ---------- PUT / PATCH ----------
         serializer = self.get_serializer(
             user,
             data=request.data,
@@ -747,7 +790,8 @@ class AuthViewSet(CommonViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        return self.ok(serializer.data)
+        response_serializer = MeResponseSerializer({'user': serializer.data})
+        return self.ok(response_serializer.data)
 
 
 __all__ = ['AuthViewSet']

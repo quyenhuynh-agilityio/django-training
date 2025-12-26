@@ -361,6 +361,80 @@ class UserProfileSerializer(
         )
 
 
+# ============================================================================
+# RESPONSE SERIALIZERS (Output Validation)
+# ============================================================================
+# Simple, explicit serializers for shaping API responses.
+
+
+class RegistrationResponseSerializer(serializers.Serializer):
+    """Response for: POST /auth/register/ — { message, user }"""
+
+    message = serializers.CharField()
+    user = UserProfileSerializer(required=True)
+
+
+class LoginResponseSerializer(serializers.Serializer):
+    """Response for: POST /auth/login/ — { message, access_token, refresh_token, user }"""
+
+    access_token = serializers.CharField(required=True, min_length=10)
+    refresh_token = serializers.CharField(required=True, min_length=10)
+    user = UserProfileSerializer(required=True)
+
+    def validate_access_token(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('Access token cannot be empty')
+        return value
+
+    def validate_refresh_token(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('Refresh token cannot be empty')
+        return value
+
+
+class LogoutSuccessResponseSerializer(serializers.Serializer):
+    """Response for: POST /auth/logout/ — { message }"""
+
+    message = serializers.CharField()
+
+
+class LogoutWithWarningResponseSerializer(serializers.Serializer):
+    """Response for: POST /auth/logout/ — { message, warning }"""
+
+    message = serializers.CharField()
+    warning = serializers.CharField()
+
+
+class PasswordResetResponseSerializer(serializers.Serializer):
+    """Response for: POST /auth/password-reset/.
+
+    Structure:
+    {
+        message: str,
+        debug?: {
+            uid: str,
+            token: str,
+            reset_link: str
+        }
+    }
+    """
+
+    message = serializers.CharField()
+    debug = serializers.DictField(required=False)
+
+
+class MessageOnlyResponseSerializer(serializers.Serializer):
+    """Generic success response — { message }."""
+
+    message = serializers.CharField()
+
+
+class MeResponseSerializer(serializers.Serializer):
+    """Response for: GET/PUT/PATCH /auth/me/ — { user }."""
+
+    user = UserProfileSerializer(required=True)
+
+
 __all__ = [
     'UserRegistrationSerializer',
     'UserLoginSerializer',
@@ -368,4 +442,11 @@ __all__ = [
     'PasswordResetConfirmSerializer',
     'ChangePasswordSerializer',
     'UserProfileSerializer',
+    'RegistrationResponseSerializer',
+    'LoginResponseSerializer',
+    'LogoutSuccessResponseSerializer',
+    'LogoutWithWarningResponseSerializer',
+    'PasswordResetResponseSerializer',
+    'MessageOnlyResponseSerializer',
+    'MeResponseSerializer',
 ]
