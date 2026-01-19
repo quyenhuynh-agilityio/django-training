@@ -220,7 +220,7 @@ class EnrollmentDataSerializer(serializers.Serializer):
 
     id = serializers.UUIDField(required=True)
     course = serializers.DictField(required=True)
-    student = serializers.DictField(required=True)
+    student = serializers.UUIDField(required=True)
     student_name = serializers.CharField(required=True, min_length=1)
     student_email = serializers.EmailField(required=True)
     status = serializers.CharField(required=True)
@@ -247,16 +247,6 @@ class EnrollmentDataSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f'Course missing required fields: {", ".join(missing_fields)}'
             )
-        return value
-
-    def validate_student(self, value):
-        if not isinstance(value, dict):
-            raise serializers.ValidationError('Student must be a dictionary')
-
-        # The student field might be just the UUID in some cases
-        if isinstance(value, str):
-            return value
-
         return value
 
 

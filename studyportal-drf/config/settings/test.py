@@ -41,8 +41,27 @@ DATABASES = {
 # Ensure no other database connections exist
 DATABASE_ROUTERS = []  # No custom routers that might route to PostgreSQL
 
-# Verify we're using SQLite (safety check)
 
+# Celery - Run tasks synchronously in tests
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# Email - Use in-memory backend for tests
+EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+
+# Cache - Use local memory cache for tests
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'test-cache',
+    }
+}
+
+# Disable Sentry in tests
+SENTRY_DSN = ''
+
+
+# Verify we're using SQLite (safety check)
 
 if 'test' in sys.argv or 'pytest' in sys.modules:
     if 'postgresql' in DATABASES['default']['ENGINE']:

@@ -401,10 +401,12 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
         enrollment = serializer.save()
 
         # Prepare response data
-        enrollment_data = EnrollmentSerializer(enrollment, context=self.context).data
+        enrollment_data = EnrollmentSerializer(
+            enrollment, context=self.get_serializer_context()
+        ).data
 
         response_data = {
-            'message': SuccessMessage.ENROLLMENT_ENROLLED_SUCCESS,
+            'message': str(SuccessMessage.ENROLLMENT_ENROLLED_SUCCESS),
             'data': enrollment_data,
         }
 
@@ -494,7 +496,7 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
 
         # Prepare response data
         response_data = {
-            'message': SuccessMessage.ENROLLMENT_LEFT_COURSE_SUCCESS,
+            'message': str(SuccessMessage.ENROLLMENT_LEFT_COURSE_SUCCESS),
             'data': {
                 'enrollment_id': str(enrollment.id),
                 'status': enrollment.status,

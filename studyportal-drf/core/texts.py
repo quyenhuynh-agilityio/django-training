@@ -47,6 +47,13 @@ class HelpText:
     COURSE_INSTRUCTOR = _('Instructor who owns this course')
     COURSE_STATUS = _('Controls visibility and enrollment rules')
     COURSE_IS_ACTIVE = _('Quick toggle to show/hide course. Set to False for soft delete.')
+    COURSE_IS_AUTO_ENROLLED = _(
+        'Automatically enroll new users in this course (e.g., for introduction courses).'
+    )
+    COURSE_IS_INTRODUCTION = (
+        "Labels this course as 'Introductory' level. Used for UI filtering and "
+        "the 'Recommended for Beginners' section."
+    )
     COURSE_MAX_STUDENTS = _('Maximum enrollment limit. Leave empty for unlimited.')
     COURSE_FILTER_TITLE = _('Filter by course title/name')
 

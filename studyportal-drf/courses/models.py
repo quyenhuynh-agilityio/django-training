@@ -78,6 +78,19 @@ class Course(models.Model):
         help_text=HelpText.COURSE_IS_ACTIVE,
     )
 
+    # ─── Auto Enrollment ──────────────────────────────────────────
+    is_auto_enrolled = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=HelpText.COURSE_IS_AUTO_ENROLLED,
+    )
+
+    # ─── Categorization/Filtering Attribute ──────────────────────
+    # Controls UI filtering and 'Introduction' grouping
+    is_introduction = models.BooleanField(
+        default=False, db_index=True, help_text=HelpText.COURSE_IS_INTRODUCTION
+    )
+
     max_students = models.PositiveIntegerField(
         null=True, blank=True, help_text=HelpText.COURSE_MAX_STUDENTS
     )

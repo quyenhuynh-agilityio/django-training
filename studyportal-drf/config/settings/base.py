@@ -22,6 +22,10 @@ environ.Env.read_env(BASE_DIR / '.env')
 
 DJANGO_ENV = env('DJANGO_ENV', default='local')
 
+# REDIS CONFIGURATION
+# ============================================
+REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+
 
 SECRET_KEY = env('SECRET_KEY', default=secrets.token_urlsafe(50))
 
@@ -51,6 +55,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'drf_spectacular',
+    # Celery
+    'django_celery_beat',
+    'django_celery_results',
     # Local apps
     'users.apps.UsersConfig',
     'courses.apps.CoursesConfig',
@@ -217,6 +224,77 @@ SPECTACULAR_SETTINGS = {
         'EnrollmentStatusEnum': 'enrollments.models.Enrollment.STATUS_CHOICES',
     },
 }
+
+
+# ============================================
+# CACHE CONFIGURATION (django-redis)
+# ============================================
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+        },
+        'KEY_PREFIX': 'studyportal',
+        'TIMEOUT': 300,  # Default: 5 minutes
+    }
+}
+
+# ============================================
+# SESSION CONFIGURATION (Optional: Use Redis)
+# ============================================
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+
+# ============================================
+# CELERY CONFIGURATION
+# ============================================
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_RESULT_EXTENDED = True
+CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
+CELERY_RESULT_BACKEND_MAX_RETRIES = 10
+
+# Celery Beat Schedule (will add tasks later)
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BEAT_SCHEDULE = {
+    # Will add scheduled tasks here
+}
+
+
+# ============================================
+# SENTRY CONFIGURATION
+# ============================================
+SENTRY_DSN = env('SENTRY_DSN', default='')
+
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+        ],
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+        environment=DJANGO_ENV,
+    )
 
 # ==============================
 # EMAIL

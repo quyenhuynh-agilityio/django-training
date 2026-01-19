@@ -2,6 +2,8 @@ import uuid
 
 import pytest
 
+from tests import factories
+
 
 @pytest.fixture
 def api_client():
@@ -106,3 +108,46 @@ def create_enrollment(create_user, create_course):
         return Enrollment.objects.create(student=student, course=course, **extra)
 
     return _create_enrollment
+
+
+# ============================================================================
+# Factory Boy Fixtures
+# ============================================================================
+# These fixtures provide factory_boy factories for more flexible test data
+# generation. They coexist with the above function-based fixtures.
+
+
+@pytest.fixture
+def user_factory():
+    """Provides UserFactory for creating users with factory_boy."""
+    return factories.UserFactory
+
+
+@pytest.fixture
+def student_factory():
+    """Provides StudentFactory for creating student users."""
+    return factories.StudentFactory
+
+
+@pytest.fixture
+def instructor_factory():
+    """Provides InstructorFactory for creating instructor users."""
+    return factories.InstructorFactory
+
+
+@pytest.fixture
+def category_factory():
+    """Provides CategoryFactory for creating categories."""
+    return factories.CategoryFactory
+
+
+@pytest.fixture
+def course_factory():
+    """Provides CourseFactory for creating courses."""
+    return factories.CourseFactory
+
+
+@pytest.fixture
+def enrollment_factory():
+    """Provides EnrollmentFactory for creating enrollments."""
+    return factories.EnrollmentFactory
