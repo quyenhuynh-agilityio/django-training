@@ -67,6 +67,11 @@ class HelpText:
     CATEGORY_NAME = _('e.g., Python, Data Science, Design')
     CATEGORY_IS_ACTIVE = _('Hide category without deleting')
 
+    # --- Notification Model ---
+    NOTIFICATION_TYPE = 'The category of the alert (e.g., ENROLLMENT, ALERT, SYSTEM).'
+    NOTIFICATION_PAYLOAD = 'A JSON object containing dynamic data like course names or URLs.'
+    NOTIFICATION_RECIPIENT = 'The user who will see this notification on their dashboard.'
+
 
 class ErrorMessage:
     # Generic / common
