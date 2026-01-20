@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description"
+              content="Verify your email address to activate your Study Portal account.">
+        <meta name="keywords"
+              content="email verification, account activation, study portal">
+        <title>Verify Your Email Address</title>
+        <style>
+            body.email-body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+
+            .email-container {
+                background-color: #f4f4f4;
+                padding: 20px;
+                border-radius: 5px;
+            }
+
+            .email-title {
+                color: #2c3e50;
+            }
+
+            .cta-wrapper {
+                text-align: center;
+                margin: 30px 0;
+            }
+
+            .button-primary {
+                background-color: #3498db;
+                color: #ffffff;
+                padding: 12px 30px;
+                text-decoration: none;
+                border-radius: 5px;
+                display: inline-block;
+                font-weight: bold;
+            }
+
+            .divider {
+                border: none;
+                border-top: 1px solid #ddd;
+                margin: 20px 0;
+            }
+
+            .footer-text {
+                font-size: 12px;
+                color: #777777;
+            }
+
+            .link-text {
+                word-break: break-all;
+                color: #3498db;
+            }
+        </style>
+    </head>
+    <body class="email-body">
+        <div class="email-container">
+            <h1 class="email-title">Verify Your Email Address</h1>
+            <p>Hello {{ user.first_name|default:user.username }},</p>
+            <p>
+                Thank you for registering with our learning platform! To complete your registration and activate your account, please verify your email address by clicking the button below:
+            </p>
+            <div class="cta-wrapper">
+                <a href="{{ verification_url }}" class="button-primary">Verify Email Address</a>
+            </div>
+            <p>Or copy and paste this link into your browser:</p>
+            <p class="link-text">{{ verification_url }}</p>
+            <p>
+                <strong>Important:</strong> This verification link will expire in {{ expiry_hours }} hours.
+            </p>
+            <p>If you did not create an account with us, please ignore this email.</p>
+            <hr class="divider">
+            <p class="footer-text">This is an automated message, please do not reply to this email.</p>
+        </div>
+    </body>
+</html>

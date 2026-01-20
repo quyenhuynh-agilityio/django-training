@@ -4,6 +4,10 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+import sentry_sdk
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -275,38 +279,56 @@ CELERY_BEAT_SCHEDULE = {
     # Will add scheduled tasks here
 }
 
+# Auto-enrollment Settings
+AUTO_ENROLL_INTRO_COURSES = env.bool('AUTO_ENROLL_INTRO_COURSES', default=True)
+INTRO_COURSE_SLUGS = ['introduction-to-platform', 'getting-started']
+
 
 # ============================================
 # SENTRY CONFIGURATION
 # ============================================
 SENTRY_DSN = env('SENTRY_DSN', default='')
+SENTRY_ENVIRONMENT = env('SENTRY_ENVIRONMENT', default='development')
+SENTRY_TRACES_SAMPLE_RATE = env.float('SENTRY_TRACES_SAMPLE_RATE', default=1.0)
 
 if SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.celery import CeleryIntegration
-    from sentry_sdk.integrations.django import DjangoIntegration
-
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[
             DjangoIntegration(),
-            CeleryIntegration(),
+            CeleryIntegration(
+                monitor_beat_tasks=True,
+                exclude_beat_tasks=[],
+            ),
+            RedisIntegration(),
         ],
-        traces_sample_rate=0.1,
-        send_default_pii=False,
-        environment=DJANGO_ENV,
+        environment=SENTRY_ENVIRONMENT,
+        traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=False,  # Don't send PII by default
+        before_send=lambda event, hint: event,  # Custom filter if needed
+        _experiments={
+            'profiles_sample_rate': 1.0,  # Profile 100% of transactions
+        },
     )
 
 # ==============================
 # EMAIL
 # ==============================
-EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+# Use real SMTP backend by default; can be overridden via EMAIL_BACKEND env var.
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 
 EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@yourdomain.com')
+
+
+# Email Verification Settings
+EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS = 24
+EMAIL_VERIFICATION_ENABLE = env.bool('EMAIL_VERIFICATION_ENABLE', default=True)
+
 
 # ==============================
 # PASSWORD RESET DEBUG OPTIONS
@@ -318,6 +340,8 @@ PASSWORD_RESET_DEBUG_EXPOSE_TOKENS = env.bool('PASSWORD_RESET_DEBUG_EXPOSE_TOKEN
 PASSWORD_RESET_DISABLE_EMAIL = env.bool('PASSWORD_RESET_DISABLE_EMAIL', default=False)
 # Frontend URL used to build reset link (falls back to localhost)
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+# Frontend URLs
+EMAIL_VERIFICATION_URL = f'{FRONTEND_URL}/verify-email'
 
 # ==============================
 # ENVIRONMENT VALIDATION

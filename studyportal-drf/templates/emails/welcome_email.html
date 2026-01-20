@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description"
+              content="Welcome email confirming your Study Portal account is active.">
+        <meta name="keywords" content="welcome, account activated, study portal">
+        <title>Welcome to Our Learning Platform!</title>
+        <style>
+            body.email-body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+
+            .email-container {
+                background-color: #f4f4f4;
+                padding: 20px;
+                border-radius: 5px;
+            }
+
+            .email-title {
+                color: #2c3e50;
+            }
+
+            .cta-wrapper {
+                text-align: center;
+                margin: 30px 0;
+            }
+
+            .button-primary {
+                background-color: #3498db;
+                color: #ffffff;
+                padding: 12px 30px;
+                text-decoration: none;
+                border-radius: 5px;
+                display: inline-block;
+                font-weight: bold;
+            }
+
+            .divider {
+                border: none;
+                border-top: 1px solid #ddd;
+                margin: 20px 0;
+            }
+
+            .footer-text {
+                font-size: 12px;
+                color: #777777;
+            }
+        </style>
+    </head>
+    <body class="email-body">
+        <div class="email-container">
+            <h1 class="email-title">Welcome, {{ user.first_name|default:user.username }}!</h1>
+            <p>Congratulations! Your email has been verified and your account is now active.</p>
+            <p>You can now access all features of our learning platform, including:</p>
+            <ul>
+                <li>Browse and enroll in courses</li>
+                <li>Track your learning progress</li>
+                <li>Interact with instructors and fellow students</li>
+                <li>Access course materials and resources</li>
+            </ul>
+            {% if user.is_student %}
+                <p>
+                    <strong>Good news!</strong> You've been automatically enrolled in our introduction courses to help you get started.
+                </p>
+            {% endif %}
+            <div class="cta-wrapper">
+                <a href="{{ dashboard_url }}" class="button-primary">Go to Dashboard</a>
+            </div>
+            <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+            <p>Happy learning!</p>
+            <hr class="divider">
+            <p class="footer-text">This is an automated message, please do not reply to this email.</p>
+        </div>
+    </body>
+</html>
