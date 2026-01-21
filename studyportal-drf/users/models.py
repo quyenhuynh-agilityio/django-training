@@ -3,7 +3,6 @@ import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
-from django.contrib.auth.models import UserManager as BaseUserManager
 from django.db import models
 from django.utils import timezone
 
@@ -13,41 +12,6 @@ from core.texts import HelpText
 # ═══════════════════════════════════════════════════════════════
 # MANAGER FOR COMMON QUERIES
 # ═══════════════════════════════════════════════════════════════
-
-
-class UserManager(BaseUserManager):
-    """
-    Custom manager for User model.
-
-    Extends Django's UserManager to provide:
-    - create_user() and create_superuser() methods
-    - Custom query methods for email verification
-    """
-
-    def unverified(self):
-        """Get all users with unverified emails"""
-        return self.filter(is_active=False, email_verification_token__isnull=False)
-
-    def verified(self):
-        """Get all users with verified emails"""
-        return self.filter(email_verified_at__isnull=False)
-
-    def pending_verification(self):
-        """Get users waiting for email verification"""
-        return self.filter(
-            is_active=False,
-            email_verification_token__isnull=False,
-            email_verification_token_created__isnull=False,
-        )
-
-    def expired_tokens(self, expiry_hours=24):
-        """Get users with expired verification tokens"""
-        expiry_threshold = timezone.now() - timedelta(hours=expiry_hours)
-        return self.filter(
-            is_active=False,
-            email_verification_token__isnull=False,
-            email_verification_token_created__lt=expiry_threshold,
-        )
 
 
 class User(AbstractUser):
@@ -127,9 +91,6 @@ class User(AbstractUser):
     # ─── Authentication Settings ────────────────────────────────
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
-
-    # Set the custom manager
-    objects = UserManager()
 
     class Meta:
         db_table = 'users'
@@ -234,19 +195,3 @@ class User(AbstractUser):
         self.email_verification_token = None
         self.email_verification_token_created = None
         self.save(update_fields=['email_verification_token', 'email_verification_token_created'])
-
-    @classmethod
-    def get_by_verification_token(cls, token):
-        """
-        Find user by verification token.
-
-        Args:
-            token: Verification token to look up
-
-        Returns:
-            User object or None
-        """
-        try:
-            return cls.objects.get(email_verification_token=token, is_active=False)
-        except cls.DoesNotExist:
-            return None
