@@ -40,7 +40,7 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True
 
 # ==============================
-# EMAIL - Console Backend
+# EMAIL
 # ==============================
-# Always use console backend in local (prints to terminal)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Inherit EMAIL_BACKEND from base.py (SMTP by default),
+# but you can still override via EMAIL_BACKEND in the local .env if needed.

@@ -1,22 +1,21 @@
 """
-Authentication Serializers
+Updated Authentication Serializers for Simplified User Model
 
-Serializers for authentication-related operations:
-- User registration
-- Login
-- Password reset (request and confirm)
-- Change password
-- User profile
+File: accounts/serializers.py
+
+Changes:
+- Removed EmailVerificationToken references
+- Validation now uses User model methods
+- Cleaner, simpler code
 """
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.serializers import (
-    get_audit_read_only_fields,
-)
+from core.serializers import get_audit_read_only_fields
 from core.texts import ErrorMessage, HelpText
 from utils.validators import (
     normalize_email,
@@ -126,31 +125,24 @@ class UserRegistrationSerializer(
 
     def create(self, validated_data):
         """
-        Create user account using Django's create_user() method,
-        which automatically handles password hashing.
-
-        Role is force-set to "student" for this serializer.
+        Create user with is_active=False and generate verification token.
         """
         validated_data.pop('password_confirm')
-        return User.objects.create_user(role='student', **validated_data)
+        user = User.objects.create_user(role='student', **validated_data)
+
+        # Generate verification token
+        user.generate_verification_token()
+
+        return user
 
 
-# ─────────────────────────────────────────────────────────────
-# Login
-# ─────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# LOGIN
+# ═══════════════════════════════════════════════════════════════
 
 
-class UserLoginSerializer(
-    serializers.Serializer,
-):
-    """
-    Authenticates user based on email + password.
-
-    Important Security Note:
-    ------------------------
-    Never disclose which field (email or password) is incorrect.
-    This prevents attackers from enumerating registered emails.
-    """
+class UserLoginSerializer(serializers.Serializer):
+    """Authenticates user based on email + password"""
 
     email = serializers.EmailField(help_text=HelpText.USER_EMAIL_ADDRESS)
     password = serializers.CharField(
@@ -164,10 +156,7 @@ class UserLoginSerializer(
 
     def validate(self, attrs):
         """
-        Validate:
-        - user exists
-        - password matches
-        - account is active
+        Validate user exists, password matches, and account is active
         """
         email = attrs['email']
         password = attrs['password']
@@ -184,22 +173,68 @@ class UserLoginSerializer(
         return attrs
 
 
-# ─────────────────────────────────────────────────────────────
-# Password reset request
-# ─────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# EMAIL VERIFICATION
+# ═══════════════════════════════════════════════════════════════
 
 
-class PasswordResetRequestSerializer(
-    serializers.Serializer,
-):
+class EmailVerificationSerializer(serializers.Serializer):
     """
-    Accepts an email for initiating password reset.
+    Validates email verification token.
 
-    Security Best Practice:
-    -----------------------
-    Do NOT check whether the email exists.
-    API should always return success to prevent revealing registered emails.
+    Much simpler now - just user_id and token!
     """
+
+    user_id = serializers.UUIDField(help_text=HelpText.EMAIL_VERIFICATION_USER_ID)
+    token = serializers.CharField(
+        min_length=32,
+        max_length=64,
+        help_text=HelpText.EMAIL_VERIFICATION_TOKEN_FROM_EMAIL,
+    )
+
+    def validate(self, attrs):
+        """Validate user_id and token"""
+        user_id = attrs['user_id']
+        token = attrs['token']
+
+        # Get user
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({'detail': ErrorMessage.INVALID_VERIFICATION_LINK})  # noqa: B904
+
+        # Check if already verified
+        if user.is_active:
+            raise serializers.ValidationError({'detail': ErrorMessage.EMAIL_ALREADY_VERIFIED})
+
+        # Validate token
+        expiry_hours = getattr(settings, 'EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS', 24)
+
+        if not user.is_verification_token_valid(token, expiry_hours):
+            raise serializers.ValidationError(
+                {'detail': ErrorMessage.INVALID_OR_EXPIRED_VERIFICATION_TOKEN}
+            )
+
+        attrs['user'] = user
+        return attrs
+
+
+class ResendVerificationSerializer(serializers.Serializer):
+    """Request new verification email"""
+
+    email = serializers.EmailField(help_text=HelpText.RESEND_VERIFICATION_EMAIL)
+
+    def validate_email(self, value):
+        return normalize_email(value)
+
+
+# ═══════════════════════════════════════════════════════════════
+# PASSWORD RESET
+# ═══════════════════════════════════════════════════════════════
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Accepts an email for initiating password reset"""
 
     email = serializers.EmailField(help_text=HelpText.PASSWORD_RESET_EMAIL)
 
@@ -207,24 +242,8 @@ class PasswordResetRequestSerializer(
         return normalize_email(value)
 
 
-# ─────────────────────────────────────────────────────────────
-# Password reset confirm
-# ─────────────────────────────────────────────────────────────
-
-
-class PasswordResetConfirmSerializer(
-    serializers.Serializer,
-):
-    """
-    Validates reset token and allows setting a new password.
-
-    Steps:
-    ------
-    1. Ensure new passwords match
-    2. Decode UID and validate user
-    3. Validate reset token
-    4. Return user for view to update password
-    """
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Validates reset token and allows setting a new password"""
 
     uid = serializers.CharField(help_text=HelpText.RESET_UID)
     token = serializers.CharField(help_text=HelpText.RESET_TOKEN)
@@ -241,42 +260,26 @@ class PasswordResetConfirmSerializer(
     )
 
     def validate(self, attrs):
-        """Validate password reset request
-
-        Steps:
-        1. Check password confirmation match
-        2. Validate UID and token
-        3. Return user for password update
-        """
-        # 1. Confirm passwords match
+        """Validate password reset request"""
+        # Confirm passwords match
         validate_password_confirmation(
             attrs['new_password'],
             attrs['new_password_confirm'],
         )
 
-        # 2. Validate UID + token and return user
+        # Validate UID + token
         user = validate_reset_token(attrs['uid'], attrs['token'])
         attrs['user'] = user
         return attrs
 
 
-# ─────────────────────────────────────────────────────────────
-# Change password
-# ─────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# CHANGE PASSWORD
+# ═══════════════════════════════════════════════════════════════
 
 
-class ChangePasswordSerializer(
-    serializers.Serializer,
-):
-    """
-    Allows already authenticated users to change their password.
-
-    Validations:
-    ------------
-    - Old password required and must be correct
-    - New password must match confirmation
-    - New password must NOT equal old password
-    """
+class ChangePasswordSerializer(serializers.Serializer):
+    """Allows authenticated users to change their password"""
 
     old_password = serializers.CharField(
         write_only=True,
@@ -296,9 +299,7 @@ class ChangePasswordSerializer(
     )
 
     def validate_old_password(self, value):
-        """
-        Critical: Verify that the provided old password is correct.
-        """
+        """Verify old password is correct"""
         user = self.context['request'].user
         if not user.check_password(value):
             raise serializers.ValidationError(ErrorMessage.OLD_PASSWORD_INCORRECT)
@@ -312,7 +313,7 @@ class ChangePasswordSerializer(
             attrs['new_password_confirm'],
         )
 
-        # New password must be different from old
+        # New password must differ from old
         if attrs['old_password'] == attrs['new_password']:
             raise serializers.ValidationError(
                 {'new_password': ErrorMessage.NEW_PASSWORD_MUST_DIFFER}
@@ -321,21 +322,16 @@ class ChangePasswordSerializer(
         return attrs
 
 
-# ─────────────────────────────────────────────────────────────
-# User profile
-# ─────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# USER PROFILE
+# ═══════════════════════════════════════════════════════════════
 
 
-class UserProfileSerializer(
-    serializers.ModelSerializer,
-):
-    """
-    Returns full user profile details.
-
-    All sensitive fields are read-only to avoid unintended data exposure.
-    """
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Returns full user profile details"""
 
     full_name = serializers.CharField(read_only=True)
+    is_email_verified = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
@@ -348,6 +344,8 @@ class UserProfileSerializer(
             'full_name',
             'role',
             'is_active',
+            'is_email_verified',
+            'email_verified_at',
             'date_joined',
             'created_at',
         ]
@@ -356,81 +354,61 @@ class UserProfileSerializer(
             'username',
             'role',
             'is_active',
+            'is_email_verified',
+            'email_verified_at',
             'date_joined',
             include_updated=False,
         )
 
 
-# ============================================================================
-# RESPONSE SERIALIZERS (Output Validation)
-# ============================================================================
-# Simple, explicit serializers for shaping API responses.
+# ═══════════════════════════════════════════════════════════════
+# RESPONSE SERIALIZERS
+# ═══════════════════════════════════════════════════════════════
 
 
 class RegistrationResponseSerializer(serializers.Serializer):
-    """Response for: POST /auth/register/ — { message, user }"""
+    """Response for POST /auth/register/"""
 
     message = serializers.CharField()
     user = UserProfileSerializer(required=True)
 
 
 class LoginResponseSerializer(serializers.Serializer):
-    """Response for: POST /auth/login/ — { message, access_token, refresh_token, user }"""
+    """Response for POST /auth/login/"""
 
     access_token = serializers.CharField(required=True, min_length=10)
     refresh_token = serializers.CharField(required=True, min_length=10)
     user = UserProfileSerializer(required=True)
 
-    def validate_access_token(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError('Access token cannot be empty')
-        return value
-
-    def validate_refresh_token(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError('Refresh token cannot be empty')
-        return value
-
 
 class LogoutSuccessResponseSerializer(serializers.Serializer):
-    """Response for: POST /auth/logout/ — { message }"""
+    """Response for POST /auth/logout/"""
 
     message = serializers.CharField()
 
 
 class LogoutWithWarningResponseSerializer(serializers.Serializer):
-    """Response for: POST /auth/logout/ — { message, warning }"""
+    """Response for POST /auth/logout/ with warning"""
 
     message = serializers.CharField()
     warning = serializers.CharField()
 
 
 class PasswordResetResponseSerializer(serializers.Serializer):
-    """Response for: POST /auth/password-reset/.
-
-    Structure:
-    {
-        message: str,
-        debug?: {
-            uid: str,
-            token: str,
-            reset_link: str
-        }
-    }
-    """
+    """Response for POST /auth/password-reset/"""
 
     message = serializers.CharField()
     debug = serializers.DictField(required=False)
 
 
 class MessageOnlyResponseSerializer(serializers.Serializer):
-    """Generic success response — { message }."""
+    """Generic success response"""
 
     message = serializers.CharField()
 
 
 class MeResponseSerializer(serializers.Serializer):
-    """Response for: GET/PUT/PATCH /auth/me/ — { user }."""
+    """Response for GET/PUT/PATCH /auth/me/"""
 
     user = UserProfileSerializer(required=True)
 
@@ -438,6 +416,8 @@ class MeResponseSerializer(serializers.Serializer):
 __all__ = [
     'UserRegistrationSerializer',
     'UserLoginSerializer',
+    'EmailVerificationSerializer',
+    'ResendVerificationSerializer',
     'PasswordResetRequestSerializer',
     'PasswordResetConfirmSerializer',
     'ChangePasswordSerializer',

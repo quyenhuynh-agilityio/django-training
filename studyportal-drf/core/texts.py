@@ -19,13 +19,24 @@ class HelpText:
     USERNAME_UNIQUE_AND_FORMAT = _('Must be unique, alphanumeric with underscores')
     USER_EMAIL_ADDRESS = _('User email address')
     USER_PASSWORD = _('User password')
+
+    # Password reset
     PASSWORD_RESET_EMAIL = _('Email address to send reset link')
     RESET_UID = _('Base64 encoded user ID from reset email')
     RESET_TOKEN = _('Password reset token from reset email')
     CURRENT_PASSWORD = _('Current password')
 
+    # Email verification (model + serializers)
+    EMAIL_VERIFICATION_TOKEN = _('Token for email verification. Cleared after verification.')
+    EMAIL_VERIFICATION_TOKEN_CREATED = _('When the verification token was generated')
+    EMAIL_VERIFIED_AT = _('When the email was verified')
+    EMAIL_VERIFICATION_USER_ID = _('User ID from verification link')
+    EMAIL_VERIFICATION_TOKEN_FROM_EMAIL = _('Verification token from email')
+    RESEND_VERIFICATION_EMAIL = _('Email address to resend verification link')
+
     # Users / models
     USER_ID = _('Secure, unguessable ID used in APIs and mobile app')
+    USER_STATUS = _('Designates whether this user should be treated as active.')
     USER_EMAIL_LOGIN = _('Used as login identifier (not username)')
     USER_ROLE = _('Determines user permissions in the platform')
     USER_CREATED_AT = _('When user registered')
@@ -67,6 +78,11 @@ class HelpText:
     CATEGORY_NAME = _('e.g., Python, Data Science, Design')
     CATEGORY_IS_ACTIVE = _('Hide category without deleting')
 
+    # --- Notification Model ---
+    NOTIFICATION_TYPE = 'The category of the alert (e.g., ENROLLMENT, ALERT, SYSTEM).'
+    NOTIFICATION_PAYLOAD = 'A JSON object containing dynamic data like course names or URLs.'
+    NOTIFICATION_RECIPIENT = 'The user who will see this notification on their dashboard.'
+
 
 class ErrorMessage:
     # Generic / common
@@ -79,8 +95,15 @@ class ErrorMessage:
     INVALID_EMAIL_OR_PASSWORD = _('Invalid email or password.')
     OLD_PASSWORD_INCORRECT = _('Old password is incorrect.')
     NEW_PASSWORD_MUST_DIFFER = _('New password must be different from the old password.')
+
+    # Password reset
     INVALID_RESET_LINK = _('Invalid reset link.')
     INVALID_OR_EXPIRED_RESET_TOKEN = _('Invalid or expired reset token.')
+
+    # Email verification
+    INVALID_VERIFICATION_LINK = _('Invalid verification link.')
+    EMAIL_ALREADY_VERIFIED = _('Email is already verified.')
+    INVALID_OR_EXPIRED_VERIFICATION_TOKEN = _('Invalid or expired verification token.')
 
     # Courses
     COURSE_TITLE_REQUIRED = _('Course title is required.')
@@ -154,7 +177,10 @@ class SuccessMessage:
     ENROLLMENT_LEFT_COURSE_SUCCESS = _('Successfully left the course')
 
     # Authentication / users
-    REGISTRATION_SUCCESS = _('Registration successful. Please login.')
+    REGISTRATION_SUCCESS = _(
+        'Registration successful. Please check your email to verify your account.'
+    )
+    EMAIL_VERIFIED_SUCCESS = _('Email verified successfully. You can now login.')
     LOGIN_SUCCESS = _('Login successful')
     LOGOUT_SUCCESS = _('Logout successful')
     PASSWORD_RESET_EMAIL_SENT = _(
@@ -164,3 +190,25 @@ class SuccessMessage:
         'Password has been reset successfully. You can now login with your new password.'
     )
     PASSWORD_CHANGED_SUCCESS = _('Password changed successfully')
+    RESEND_VERIFICATION_MESSAGE = _(
+        'If an unverified account exists with this email, ' 'a new verification link has been sent.'
+    )
+
+
+class EmailSubject:
+    """Email subject lines for all email types."""
+
+    VERIFY_EMAIL = _('Verify Your Email Address')
+    WELCOME = _('Welcome to Our Learning Platform!')
+    PASSWORD_RESET_REQUEST = _('Password Reset Request')
+    PASSWORD_RESET_CONFIRMATION = _('Password Reset Confirmation')
+
+
+class EmailMessage:
+    """Email-related log messages and breadcrumbs."""
+
+    VERIFICATION_SENT = _('Verification email sent successfully')
+    WELCOME_SENT = _('Welcome email sent successfully')
+    PASSWORD_RESET_SENT = _('Password reset email sent successfully')
+    PASSWORD_RESET_CONFIRMATION_SENT = _('Password reset confirmation email sent successfully')
+    AUTO_ENROLLED = _('Auto-enrolled user in {count} courses')
