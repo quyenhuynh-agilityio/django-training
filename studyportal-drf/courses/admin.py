@@ -10,6 +10,7 @@ from utils.admin.badges import status_badge
 from utils.admin.display import admin_link
 
 from .models import Course
+from .statistics import CourseStatistics
 
 
 class EnrollmentInline(admin.TabularInline):
@@ -23,15 +24,11 @@ class EnrollmentInline(admin.TabularInline):
         return False
 
 
-# ─────────────────────────────────────────────────────────────
-# Course Admin
-# ─────────────────────────────────────────────────────────────
-
-
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     """
     Course Admin — UI-focused, safe, and scalable.
+    Uses cached statistics via CourseStatistics class.
     """
 
     # ── List View ─────────────────────────────────────────────
@@ -62,7 +59,13 @@ class CourseAdmin(admin.ModelAdmin):
     # ── Forms ────────────────────────────────────────────────
     filter_horizontal = ('categories',)
     autocomplete_fields = ('instructor',)
-    readonly_fields = ('created_at', 'updated_at', 'enrollment_stats')
+    readonly_fields = (
+        'created_at',
+        'updated_at',
+        'enrollment_stats',
+        'display_average_enrollment',
+        'display_top_courses',
+    )
     inlines = (EnrollmentInline,)
 
     fieldsets = (
@@ -92,10 +95,20 @@ class CourseAdmin(admin.ModelAdmin):
             },
         ),
         (
-            _('Statistics'),
+            _('Enrollment Details'),
             {
                 'classes': ('collapse',),
                 'fields': ('enrollment_stats',),
+            },
+        ),
+        (
+            _('System-Wide Statistics (Cached)'),
+            {
+                'description': _(
+                    'These statistics are cached and updated every '
+                    'STATISTICS_CACHE_TIMEOUT seconds for performance.'
+                ),
+                'fields': ('display_average_enrollment', 'display_top_courses'),
             },
         ),
         (
@@ -197,6 +210,7 @@ class CourseAdmin(admin.ModelAdmin):
 
     @admin.display(description=_('Enrollment Statistics'))
     def enrollment_stats(self, obj):
+        """Per-course enrollment breakdown (not cached - always fresh)."""
         if not obj.pk:
             return _('Save course to view statistics')
 
@@ -213,6 +227,70 @@ class CourseAdmin(admin.ModelAdmin):
             qs.filter(status=Enrollment.STATUS_COMPLETED).count(),
             _('Dropped'),
             qs.filter(status=Enrollment.STATUS_DROPPED).count(),
+        )
+
+    @admin.display(description=_('Average Enrollment (All Courses)'))
+    def display_average_enrollment(self, obj):
+        """
+        System-wide average enrollment statistic.
+        Uses cached data from CourseStatistics for performance.
+        Cache refreshes every STATISTICS_CACHE_TIMEOUT seconds.
+        """
+        stats = CourseStatistics.get_average_enrollments()
+
+        return format_html(
+            '<div style="padding:10px; background:#f8f9fa; border-radius:4px;">'
+            '<div style="font-size:13px; color:#666; margin-bottom:5px;">System-Wide Average</div>'
+            '<div style="font-size:24px; font-weight:600; color:#28a745;">{:.2f}</div>'
+            '<div style="font-size:11px; color:#999; margin-top:5px;">'
+            '{} total courses | {} total enrollments'
+            '</div>'
+            '</div>',
+            stats['average'],
+            stats['total_courses'],
+            stats['total_enrollments'],
+        )
+
+    @admin.display(description=_('Top 5 Courses by Enrollment'))
+    def display_top_courses(self, obj):
+        """
+        Top courses by enrollment count.
+        Uses cached data from CourseStatistics for performance.
+        Cache refreshes every STATISTICS_CACHE_TIMEOUT seconds.
+        """
+        top_courses = CourseStatistics.get_top_courses(limit=5)
+
+        if not top_courses:
+            return format_html(
+                '<span style="color:#999; font-style:italic;">No courses yet.</span>'
+            )
+
+        items = []
+        for idx, course in enumerate(top_courses, 1):
+            # Use annotated enrollment_count from statistics
+            count = getattr(course, 'enrollment_count', 0)
+
+            # Add medal emoji for top 3
+            medal = {1: '🥇', 2: '🥈', 3: '🥉'}.get(idx, '  ')
+
+            items.append(
+                format_html(
+                    '<li style="padding:5px 0; border-bottom:1px solid #eee;">'
+                    '<span style="font-size:16px; margin-right:8px;">{}</span>'
+                    '<strong>{}</strong> '
+                    '<span style="color:#28a745; font-weight:600;">({} enrollments)</span>'
+                    '</li>',
+                    medal,
+                    course.title,
+                    count,
+                )
+            )
+
+        return format_html(
+            '<div style="padding:10px; background:#f8f9fa; border-radius:4px;">'
+            '<ul style="list-style:none; padding:0; margin:0;">{}</ul>'
+            '</div>',
+            ''.join(items),
         )
 
     # ─────────────────────────────────────────────────────────

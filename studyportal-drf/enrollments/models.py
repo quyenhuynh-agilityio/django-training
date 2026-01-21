@@ -10,9 +10,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from core.choices import EnrollmentStatus, UserRole
+from core.choices import CourseStatus, EnrollmentStatus, UserRole
 from core.texts import ErrorMessage, HelpText
-from courses.models import Course
 
 
 class Enrollment(models.Model):
@@ -87,7 +86,7 @@ class Enrollment(models.Model):
                 raise ValidationError(ErrorMessage.COURSE_NOT_ACTIVE)
 
             # Course must have status='active' (not draft, in_progress, or completed)
-            if self.course.status != Course.STATUS_ACTIVE:
+            if self.course.status != CourseStatus.ACTIVE:
                 raise ValidationError(ErrorMessage.COURSE_NOT_OPEN_FOR_ENROLLMENT)
 
             # Course must not be full
