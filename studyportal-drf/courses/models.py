@@ -175,5 +175,5 @@ class Course(models.Model):
             self.is_full_notified = True
             self.save(update_fields=['is_full_notified'])
 
-            # ✅ only enqueue task AFTER DB commit
+            # only enqueue task AFTER DB commit
             transaction.on_commit(lambda: send_course_full_email.delay(str(self.id)))

@@ -231,19 +231,14 @@ class CourseAdmin(admin.ModelAdmin):
 
     @admin.display(description=_('Average Enrollment (All Courses)'))
     def display_average_enrollment(self, obj):
-        """
-        System-wide average enrollment statistic.
-        Uses cached data from CourseStatistics for performance.
-        Cache refreshes every STATISTICS_CACHE_TIMEOUT seconds.
-        """
+        """Display cached system-wide average enrollment."""
         stats = CourseStatistics.get_average_enrollments()
 
         return format_html(
             '<div style="padding:10px; background:#f8f9fa; border-radius:4px;">'
-            '<div style="font-size:13px; color:#666; margin-bottom:5px;">System-Wide Average</div>'
             '<div style="font-size:24px; font-weight:600; color:#28a745;">{:.2f}</div>'
             '<div style="font-size:11px; color:#999; margin-top:5px;">'
-            '{} total courses | {} total enrollments'
+            '{} courses | {} enrollments'
             '</div>'
             '</div>',
             stats['average'],
@@ -266,21 +261,16 @@ class CourseAdmin(admin.ModelAdmin):
             )
 
         items = []
-        for idx, course in enumerate(top_courses, 1):
+        for course in top_courses:  # ✅ Removed unused idx
             # Use annotated enrollment_count from statistics
             count = getattr(course, 'enrollment_count', 0)
-
-            # Add medal emoji for top 3
-            medal = {1: '🥇', 2: '🥈', 3: '🥉'}.get(idx, '  ')
 
             items.append(
                 format_html(
                     '<li style="padding:5px 0; border-bottom:1px solid #eee;">'
-                    '<span style="font-size:16px; margin-right:8px;">{}</span>'
                     '<strong>{}</strong> '
                     '<span style="color:#28a745; font-weight:600;">({} enrollments)</span>'
                     '</li>',
-                    medal,
                     course.title,
                     count,
                 )
