@@ -8,8 +8,6 @@ from celery.signals import (
     task_success,
 )
 
-from django.conf import settings
-
 # Set default Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
 
@@ -20,7 +18,7 @@ app = Celery('studyportal')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Auto-discover tasks in all installed apps
-app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
+app.autodiscover_tasks()
 
 
 # ============================================================================

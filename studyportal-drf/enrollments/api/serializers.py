@@ -122,6 +122,14 @@ class EnrollmentCreateSerializer(serializers.Serializer):
                 )
 
             if course.is_full:
+                # Always enqueue a capacity notification when a student is blocked because the
+                # course is full. This will call the Celery task on every such request.
+                from django.db import transaction
+
+                from courses.tasks import send_course_full_email
+
+                transaction.on_commit(lambda: send_course_full_email.delay(str(course.id)))
+
                 raise serializers.ValidationError({'course_id': ErrorMessage.COURSE_AT_CAPACITY})
 
         # --- Duplicate enrollment ---------------------------------------------

@@ -2,7 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 
 from core.choices import CourseStatus, UserRole
 from core.texts import ErrorMessage, HelpText
@@ -95,6 +95,8 @@ class Course(models.Model):
         null=True, blank=True, help_text=HelpText.COURSE_MAX_STUDENTS
     )
 
+    is_full_notified = models.BooleanField(default=False)
+
     # ─── Timestamps ─────────────────────────────────────────────
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -163,3 +165,15 @@ class Course(models.Model):
 
         self.is_active = False
         self.save(update_fields=['is_active', 'updated_at'])
+
+    def check_and_notify_if_full(self):
+        from .tasks import send_course_full_email
+
+        active_count = self.enrollments.filter(is_active=True).count()
+
+        if active_count >= self.max_students and not self.is_full_notified:
+            self.is_full_notified = True
+            self.save(update_fields=['is_full_notified'])
+
+            # only enqueue task AFTER DB commit
+            transaction.on_commit(lambda: send_course_full_email.delay(str(self.id)))

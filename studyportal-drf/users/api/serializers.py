@@ -15,6 +15,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from core.choices import UserRole
 from core.serializers import get_audit_read_only_fields
 from core.texts import ErrorMessage, HelpText
 from utils.validators import (
@@ -128,7 +129,7 @@ class UserRegistrationSerializer(
         Create user with is_active=False and generate verification token.
         """
         validated_data.pop('password_confirm')
-        user = User.objects.create_user(role='student', **validated_data)
+        user = User.objects.create_user(role=UserRole.STUDENT, **validated_data)
 
         # Generate verification token
         user.generate_verification_token()
