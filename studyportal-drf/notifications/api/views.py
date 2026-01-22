@@ -31,6 +31,10 @@ from .serializers import (
         description="""
         Get paginated list of notifications for the authenticated user.
 
+        **Available for:**
+        - Students: See removal notifications
+        - Instructors: See enrollment and course full notifications
+
         **Filtering:**
         - `?is_read=false` - Only unread notifications
         - `?is_read=true` - Only read notifications
@@ -40,7 +44,7 @@ from .serializers import (
         - `?ordering=-created_at` - Newest first (default)
         - `?ordering=created_at` - Oldest first
 
-        Results are cached for performance.
+        Results are cached for 60 seconds for performance.
         """,
         parameters=[
             OpenApiParameter(
@@ -54,6 +58,7 @@ from .serializers import (
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 description='Filter by notification type',
+                enum=['STUDENT_ENROLLED', 'STUDENT_REMOVED', 'COURSE_FULL'],
             ),
         ],
         responses={
@@ -64,9 +69,10 @@ from .serializers import (
     ),
     retrieve=extend_schema(
         summary='Get notification detail',
-        description='Retrieve a specific notification by ID.',
+        description='Retrieve a specific notification by ID. Only the recipient can access it.',
         responses={
             200: NotificationDetailResponseSerializer,
+            403: OpenApiResponse(description='Not your notification'),
             404: OpenApiResponse(description='Notification not found'),
         },
         tags=['Notifications'],
@@ -76,12 +82,21 @@ class NotificationViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
     """
     Notification ViewSet
 
-    Provides endpoints for users to:
-    - View their notifications (cached)
+    Allows authenticated users (students and instructors) to:
+    - View their own notifications
     - Mark notifications as read
-    - Mark all notifications as read
-    - Get unread count (cached)
-    - Filter by read/unread status and type
+    - Get unread notification count
+
+    **Permissions:**
+    - List/retrieve: Authenticated users can only see their own notifications
+    - Mark as read: Only the notification recipient
+
+    **Notifications for Students:**
+    - STUDENT_REMOVED: When removed from a course
+
+    **Notifications for Instructors:**
+    - STUDENT_ENROLLED: When a student enrolls in their course
+    - COURSE_FULL: When course reaches maximum capacity
     """
 
     serializer_class = NotificationSerializer
@@ -100,9 +115,18 @@ class NotificationViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         summary='Mark notification as read',
-        description='Mark a specific notification as read. Clears unread count cache.',
+        description="""
+        Mark a specific notification as read.
+
+        **Effects:**
+        - Sets `is_read` to `true`
+        - Clears unread count cache for the user
+
+        Only the notification recipient can mark it as read.
+        """,
         responses={
             200: MarkAsReadResponseSerializer,
+            403: OpenApiResponse(description='Not your notification'),
             404: OpenApiResponse(description='Notification not found'),
         },
         tags=['Notifications'],
@@ -123,7 +147,15 @@ class NotificationViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
 
     @extend_schema(
         summary='Mark all notifications as read',
-        description='Mark all unread notifications as read for the current user. Clears cache.',
+        description="""
+        Mark all unread notifications as read for the current user.
+
+        **Effects:**
+        - Sets `is_read` to `true` for all unread notifications
+        - Clears unread count cache
+
+        Returns the count of notifications that were marked as read.
+        """,
         responses={200: MarkAllAsReadResponseSerializer},
         tags=['Notifications'],
     )
@@ -160,7 +192,7 @@ class NotificationViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
         - Cache is automatically cleared when notifications are marked as read
 
         **Use Case:**
-        Display badge count in navigation bar.
+        Display badge count in navigation bar or dashboard.
         """,
         responses={200: UnreadCountResponseSerializer},
         tags=['Notifications'],

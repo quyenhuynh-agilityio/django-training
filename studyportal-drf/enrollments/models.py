@@ -101,11 +101,14 @@ class Enrollment(models.Model):
             self.full_clean()
         super().save(*args, **kwargs)
 
-    def unenroll(self):
+    def unenroll(self, removed_by=None):
         """
-        Called when student leaves course.
+        Unenroll student and send notification.
+
+          alled when student leaves course.
         Used in: Student mobile app, API endpoint.
         """
+        # Mark as inactive
         self.is_active = False
         self.status = EnrollmentStatus.DROPPED
         self.save(update_fields=['is_active', 'status', 'updated_at'])

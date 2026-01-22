@@ -24,17 +24,13 @@ class NotificationType:
     """Notification type constants"""
 
     STUDENT_ENROLLED = 'STUDENT_ENROLLED'
-    COURSE_CAPACITY = 'COURSE_CAPACITY'
     STUDENT_REMOVED = 'STUDENT_REMOVED'
-    COURSE_UPDATED = 'COURSE_UPDATED'
-    SYSTEM_ANNOUNCEMENT = 'SYSTEM_ANNOUNCEMENT'
+    COURSE_FULL = 'COURSE_FULL'
 
     CHOICES = [
         (STUDENT_ENROLLED, 'Student Enrolled'),
-        (COURSE_CAPACITY, 'Course Full'),
         (STUDENT_REMOVED, 'Student Removed'),
-        (COURSE_UPDATED, 'Course Updated'),
-        (SYSTEM_ANNOUNCEMENT, 'System Announcement'),
+        (COURSE_FULL, 'Course Full'),
     ]
 
 

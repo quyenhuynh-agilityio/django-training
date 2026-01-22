@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class Notification(models.Model):
     """
-    Advanced Notification model using JSON payload for dynamic content.
+    Notification model for enrollment events.
     Supports caching and async creation via Celery.
     """
 

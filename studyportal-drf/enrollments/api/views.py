@@ -23,6 +23,10 @@ from core.api_views import CommonViewSet
 from core.permissions import IsStudent
 from core.texts import SuccessMessage
 from enrollments.models import Enrollment
+from notifications.tasks import (
+    create_student_enrolled_notification,
+    create_student_removed_notification,
+)
 
 from .serializers import (
     EnrollmentCreateSerializer,
@@ -414,6 +418,19 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
         response_serializer = EnrollmentEnrollResponseSerializer(data=response_data)
         response_serializer.is_valid(raise_exception=True)
 
+        create_student_enrolled_notification.delay(
+            # instructor_id is on the course model
+            instructor_id=str(enrollment.course.instructor_id),
+            # student properties
+            student_id=str(enrollment.student.id),
+            student_name=enrollment.student.full_name,
+            student_email=enrollment.student.email,
+            # course properties
+            course_id=str(enrollment.course.id),
+            course_code=enrollment.course.course_code,
+            course_title=enrollment.course.title,
+        )
+
         return self.created(response_serializer.data)
 
     @extend_schema(
@@ -506,6 +523,13 @@ class StudentEnrolledCoursesViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet
         # Validate response structure
         response_serializer = EnrollmentLeaveResponseSerializer(data=response_data)
         response_serializer.is_valid(raise_exception=True)
+
+        create_student_removed_notification.delay(
+            student_id=str(enrollment.student.id),
+            course_id=str(enrollment.course.id),
+            course_code=enrollment.course.course_code,
+            course_title=enrollment.course.title,
+        )
 
         return self.ok(response_serializer.data)
 
