@@ -343,6 +343,10 @@ FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 # Frontend URLs
 EMAIL_VERIFICATION_URL = f'{FRONTEND_URL}/verify-email'
 
+
+# Notification unread count cache timeout (seconds)
+NOTIFICATION_CACHE_TIMEOUT = 60  # 1 minute
+
 # ==============================
 # ENVIRONMENT VALIDATION
 # ==============================

@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/v1/', include('categories.api.urls')),
     path('api/v1/', include('courses.api.urls')),
     path('api/v1/', include('enrollments.api.urls')),
+    path('api/v1/', include('notifications.api.urls')),
     # ─────────────────────────────────────────────
     # API Documentation
     # ─────────────────────────────────────────────

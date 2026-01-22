@@ -1,30 +1,38 @@
+import logging
 import uuid
 
 from django.conf import settings
 from django.db import models
 
+from core.choices import NotificationType
 from core.texts import HelpText
+
+logger = logging.getLogger(__name__)
 
 
 class Notification(models.Model):
     """
     Advanced Notification model using JSON payload for dynamic content.
+    Supports caching and async creation via Celery.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    # The user receiving the alert
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='notifications',
-        help_text=HelpText.NOTIFICATION_RECIPIENT,  # Defined in your texts file
+        db_index=True,
+        help_text=HelpText.NOTIFICATION_RECIPIENT,
     )
 
-    # Categorization (e.g., 'ENROLLMENT', 'COURSE_FULL', 'SYSTEM_MAINTENANCE')
-    type = models.CharField(max_length=50, db_index=True, help_text=HelpText.NOTIFICATION_TYPE)
+    type = models.CharField(
+        max_length=50,
+        choices=NotificationType.CHOICES,
+        db_index=True,
+        help_text=HelpText.NOTIFICATION_TYPE,
+    )
 
-    # Dynamic data (e.g., {"course_id": "...", "course_name": "...", "actor": "..."})
     payload = models.JSONField(default=dict, help_text=HelpText.NOTIFICATION_PAYLOAD)
 
     is_read = models.BooleanField(default=False, db_index=True)
@@ -35,6 +43,45 @@ class Notification(models.Model):
     class Meta:
         db_table = 'notifications'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', '-created_at']),
+            models.Index(fields=['recipient', 'is_read']),
+            models.Index(fields=['type', 'recipient']),
+        ]
 
     def __str__(self):
         return f'{self.type} for {self.recipient.email}'
+
+    def mark_as_read(self):
+        """Mark notification as read and invalidate cache"""
+        if not self.is_read:
+            self.is_read = True
+            self.save(update_fields=['is_read', 'updated_at'])
+
+            # Clear user's unread count cache
+            from django.core.cache import cache
+
+            cache_key = f'notification_unread_count_{self.recipient_id}'
+            cache.delete(cache_key)
+
+    @classmethod
+    def get_unread_count_cached(cls, user_id):
+        """
+        Get cached unread notification count for user.
+        Cache timeout: 60 seconds (configurable via settings).
+        """
+        from django.core.cache import cache
+
+        cache_key = f'notification_unread_count_{user_id}'
+        cached_count = cache.get(cache_key)
+
+        if cached_count is not None:
+            return cached_count
+
+        count = cls.objects.filter(recipient_id=user_id, is_read=False).count()
+
+        # Cache for 60 seconds
+        timeout = getattr(settings, 'NOTIFICATION_CACHE_TIMEOUT', 60)
+        cache.set(cache_key, count, timeout)
+
+        return count
