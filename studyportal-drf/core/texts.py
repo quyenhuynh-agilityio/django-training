@@ -203,6 +203,7 @@ class EmailSubject:
     PASSWORD_RESET_REQUEST = _('Password Reset Request')
     PASSWORD_RESET_CONFIRMATION = _('Password Reset Confirmation')
     COURSE_CAPACITY_REACHED = _('Course Enrollment Capacity Reached')
+    MONTHLY_ENROLLMENT_REPORT = _('Monthly Enrollment Report')
 
 
 class EmailMessage:

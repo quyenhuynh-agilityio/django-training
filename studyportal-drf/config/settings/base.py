@@ -281,6 +281,18 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'courses.cleanup_inactive_courses',
         'schedule': crontab(hour=3, minute=0, day_of_week='sunday'),  # 3:00 AM every Sunday
     },
+    'send-monthly-enrollment-report': {
+        'task': 'courses.send_monthly_enrollment_report',
+        'schedule': crontab(
+            hour=4, minute=0, day_of_month='1'
+        ),  # 4:00 AM on the 1st of every month
+    },
+    # 'send-monthly-enrollment-report': {
+    #     'task': 'courses.send_monthly_enrollment_report',
+    #     'schedule': crontab(day_of_month='1', hour='9', minute='0'),  # 1st day, 9 AM
+    #     # Or for testing every 2 minutes:
+    #     # 'schedule': crontab(minute='*/2'),
+    # },
 }
 
 # Auto-enrollment Settings
