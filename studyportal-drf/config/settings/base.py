@@ -5,6 +5,7 @@ from pathlib import Path
 
 import environ
 import sentry_sdk
+from celery.schedules import crontab
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
@@ -276,7 +277,10 @@ CELERY_RESULT_BACKEND_MAX_RETRIES = 10
 # Celery Beat Schedule (will add tasks later)
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 CELERY_BEAT_SCHEDULE = {
-    # Will add scheduled tasks here
+    'cleanup-inactive-courses-weekly': {
+        'task': 'courses.cleanup_inactive_courses',
+        'schedule': crontab(hour=3, minute=0, day_of_week='sunday'),  # 3:00 AM every Sunday
+    },
 }
 
 # Auto-enrollment Settings

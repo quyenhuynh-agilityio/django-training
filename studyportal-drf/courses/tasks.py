@@ -6,6 +6,7 @@ Tasks include retry logic and Sentry error tracking.
 """
 
 import logging
+from datetime import timedelta
 
 import sentry_sdk
 from celery import shared_task
@@ -13,9 +14,11 @@ from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.html import strip_tags
 
 from core.texts import EmailSubject
+from courses.models import Course
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +86,6 @@ def send_course_full_email(self, course_id):
     """
     Sends an email to the instructor when a course reaches its enrollment limit.
     """
-    from .models import Course  # Inline import to avoid circular dependencies
 
     try:
         # Optimization: select_related instructor to avoid extra DB hits in helper
@@ -136,3 +138,25 @@ def send_course_full_email(self, course_id):
         logger.error(f'Unexpected error in send_course_full_email for {course_id}: {exc}')
         sentry_sdk.capture_exception(exc)
         raise self.retry(exc=exc)  # noqa: B904
+
+
+@shared_task(name='courses.cleanup_inactive_courses')
+def cleanup_inactive_courses():
+    """
+    Weekly task to permanently delete courses that have been
+    inactive (soft-deleted) for more than 3 months.
+    """
+    three_months_ago = timezone.now() - timedelta(days=90)
+
+    # Identify courses to purge
+    to_delete = Course.objects.filter(is_active=False, updated_at__lte=three_months_ago)
+
+    count = to_delete.count()
+    if count > 0:
+        logger.info(f'Starting cleanup: Removing {count} inactive courses.')
+        to_delete.delete()  # This performs a hard delete from the DB
+        logger.info('Cleanup successful.')
+    else:
+        logger.info('No inactive courses found for cleanup.')
+
+    return {'deleted_count': count}
