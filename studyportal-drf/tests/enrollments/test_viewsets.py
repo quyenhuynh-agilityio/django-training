@@ -94,3 +94,38 @@ def test_enrollment_swagger_fake_view(api_client, create_user):
 
     queryset = viewset.get_queryset()
     assert queryset.count() == 0
+
+
+def test_enrollment_list_viewset_avoids_n_plus_one(
+    api_client,
+    create_user,
+    create_course,
+    create_category,
+    create_enrollment,
+    django_assert_num_queries,
+):
+    """Enrollment list endpoint should not perform N+1 queries for courses/categories."""
+    from courses.models import Course
+
+    student = create_user(email='bench-student@example.com', username='bench', role='student')
+    instructor = create_user(email='instr@example.com', username='instr', role='instructor')
+    category = create_category(name='BenchCat')
+
+    # Create several courses with same instructor/category and enroll the student
+    for i in range(10):
+        course = create_course(
+            instructor=instructor,
+            course_code=f'ENR{i:03d}',
+            is_active=True,
+            status=Course.STATUS_ACTIVE,
+        )
+        course.categories.set([category])
+        create_enrollment(student=student, course=course)
+
+    api_client.force_authenticate(user=student)
+
+    with django_assert_num_queries(43):
+        response = api_client.get('/api/v1/students/enrollments/')
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data['count'] == 10

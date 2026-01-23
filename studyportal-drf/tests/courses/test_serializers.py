@@ -2,7 +2,13 @@ import pytest
 
 from rest_framework import serializers
 
-from courses.api.serializers import CourseCreateUpdateSerializer, CourseDetailSerializer
+from courses.api.serializers import (
+    CourseCreateUpdateSerializer,
+    CourseDeleteResponseSerializer,
+    CourseDetailSerializer,
+    EnrolledStudentsResponseSerializer,
+    PaginatedResponseSerializer,
+)
 from courses.models import Course
 
 pytestmark = pytest.mark.django_db
@@ -242,3 +248,157 @@ def test_validate_category_ids_duplicates_removed(create_category):
     assert serializer.is_valid(), serializer.errors
     # Should have only one unique ID
     assert len(serializer.validated_data['category_ids']) == 1
+
+
+def test_course_code_validation_empty():
+    """Test course code validation rejects empty codes"""
+
+    serializer = CourseCreateUpdateSerializer(data={'title': 'Test', 'course_code': ''})
+    assert serializer.is_valid() is False
+    assert 'course_code' in serializer.errors
+
+
+def test_course_code_validation_whitespace():
+    """Test course code validation rejects whitespace-only codes"""
+
+    serializer = CourseCreateUpdateSerializer(data={'title': 'Test', 'course_code': '   '})
+    assert serializer.is_valid() is False
+    assert 'course_code' in serializer.errors
+
+
+def test_course_code_validation_invalid_chars():
+    """Test course code validation rejects invalid characters"""
+
+    serializer = CourseCreateUpdateSerializer(data={'title': 'Test', 'course_code': 'CODE@123'})
+    assert serializer.is_valid() is False
+    assert 'course_code' in serializer.errors
+
+
+def test_course_code_normalization():
+    """Test course code is normalized to uppercase"""
+
+    serializer = CourseCreateUpdateSerializer(data={'title': 'Test', 'course_code': 'code123'})
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data['course_code'] == 'CODE123'
+
+
+def test_max_students_validation_negative():
+    """Test max_students validation rejects negative values"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'max_students': -1}
+    )
+    assert serializer.is_valid() is False
+    assert 'max_students' in serializer.errors
+
+
+def test_max_students_validation_zero():
+    """Test max_students validation rejects zero"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'max_students': 0}
+    )
+    assert serializer.is_valid() is False
+    assert 'max_students' in serializer.errors
+
+
+def test_status_validation_invalid():
+    """Test status validation rejects invalid status"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'status': 'invalid'}
+    )
+    assert serializer.is_valid() is False
+    assert 'status' in serializer.errors
+
+
+def test_video_url_validation_invalid_scheme():
+    """Test video URL validation rejects invalid schemes"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'video_url': 'ftp://example.com/video.mp4'}
+    )
+    assert serializer.is_valid() is False
+    assert 'video_url' in serializer.errors
+
+
+def test_image_url_validation_invalid_scheme():
+    """Test image URL validation rejects invalid schemes"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'image_url': 'ftp://example.com/image.jpg'}
+    )
+    assert serializer.is_valid() is False
+    assert 'image_url' in serializer.errors
+
+
+def test_validate_max_students_zero():
+    """Test max_students validation rejects zero"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'max_students': 0}
+    )
+    assert serializer.is_valid() is False
+    assert 'max_students' in serializer.errors
+
+
+def test_validate_video_url_invalid_scheme():
+    """Test video URL validation rejects invalid schemes"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'video_url': 'ftp://example.com/video.mp4'}
+    )
+    assert serializer.is_valid() is False
+    assert 'video_url' in serializer.errors
+
+
+def test_validate_image_url_invalid_scheme():
+    """Test image URL validation rejects invalid schemes"""
+
+    serializer = CourseCreateUpdateSerializer(
+        data={'title': 'Test', 'course_code': 'TEST001', 'image_url': 'ftp://example.com/image.jpg'}
+    )
+    assert serializer.is_valid() is False
+    assert 'image_url' in serializer.errors
+
+
+def test_paginated_response_validate_count_negative():
+    """Test PaginatedResponseSerializer rejects negative count"""
+
+    serializer = PaginatedResponseSerializer(data={'count': -1})
+    assert serializer.is_valid() is False
+    assert 'count' in serializer.errors
+
+
+def test_enrolled_students_request_validate_message_empty():
+    """Test CourseDeleteResponseSerializer rejects empty message"""
+    serializer = CourseDeleteResponseSerializer(
+        data={
+            'message': '',
+            'course_id': '12345678-1234-5678-9012-123456789012',
+            'course_code': 'TEST001',
+        }
+    )
+    assert serializer.is_valid() is False
+    assert 'message' in serializer.errors
+
+
+def test_enrolled_students_request_validate_course_code_empty():
+    """Test CourseDeleteResponseSerializer rejects empty course_code"""
+
+    serializer = CourseDeleteResponseSerializer(
+        data={
+            'message': 'Test message',
+            'course_id': '12345678-1234-5678-9012-123456789012',
+            'course_code': '',
+        }
+    )
+    assert serializer.is_valid() is False
+    assert 'course_code' in serializer.errors
+
+
+def test_enrolled_students_response_validate_results_not_list():
+    """Test EnrolledStudentsResponseSerializer rejects non-list results"""
+    serializer = EnrolledStudentsResponseSerializer(data={'count': 0, 'results': 'not_a_list'})
+    assert serializer.is_valid() is False
+    assert 'results' in serializer.errors

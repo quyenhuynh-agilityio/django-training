@@ -1,8 +1,10 @@
 import pytest
 
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.test import RequestFactory
 
+from courses.models import Course
 from utils.course_queries import (
     build_course_list_context,
     filter_courses_by_category,
@@ -20,7 +22,6 @@ pytestmark = pytest.mark.django_db
 
 def test_get_user_enrolled_ids_anonymous_user():
     """Test that anonymous users return empty set"""
-    from django.contrib.auth.models import AnonymousUser
 
     user = AnonymousUser()
     enrolled_ids = get_user_enrolled_ids(user)
@@ -82,8 +83,6 @@ def test_filter_courses_by_user_staff(create_user, create_course):
     active_course = create_course(course_code='CRS003', is_active=True)
     inactive_course = create_course(course_code='CRS004', is_active=False)
 
-    from courses.models import Course
-
     courses = Course.objects.all()
     filtered = filter_courses_by_user(courses, staff_user)
 
@@ -97,8 +96,6 @@ def test_filter_courses_by_user_regular(create_user, create_course):
 
     active_course = create_course(course_code='CRS005', is_active=True)
     inactive_course = create_course(course_code='CRS006', is_active=False)
-
-    from courses.models import Course
 
     courses = Course.objects.all()
     filtered = filter_courses_by_user(courses, user)
@@ -114,8 +111,6 @@ def test_filter_courses_by_view_enrolled(create_user, create_course, create_enro
     not_enrolled_course = create_course(course_code='CRS008')
     create_enrollment(student=user, course=enrolled_course)
 
-    from courses.models import Course
-
     courses = Course.objects.all()
     filtered = filter_courses_by_view(courses, 'enrolled', user)
 
@@ -129,8 +124,6 @@ def test_filter_courses_by_view_all(create_user, create_course):
     course1 = create_course(course_code='CRS009')
     course2 = create_course(course_code='CRS010')
 
-    from courses.models import Course
-
     courses = Course.objects.all()
     filtered = filter_courses_by_view(courses, 'all', user)
 
@@ -143,8 +136,6 @@ def test_filter_courses_by_search_query(create_course):
     python_course = create_course(course_code='CRS011', title='Python Programming')
     java_course = create_course(course_code='CRS012', title='Java Basics')
 
-    from courses.models import Course
-
     courses = Course.objects.all()
     filtered = filter_courses_by_search_query(courses, 'Python')
 
@@ -156,8 +147,6 @@ def test_filter_courses_by_search_query_empty(create_course):
     """Test that empty search query returns all courses"""
     course1 = create_course(course_code='CRS013')
     course2 = create_course(course_code='CRS014')
-
-    from courses.models import Course
 
     courses = Course.objects.all()
     filtered = filter_courses_by_search_query(courses, '')
@@ -174,8 +163,6 @@ def test_filter_courses_by_category(create_category, create_course):
     course1.categories.set([category])
     course2.categories.set([])
 
-    from courses.models import Course
-
     courses = Course.objects.all()
     filtered = filter_courses_by_category(courses, str(category.id))
 
@@ -187,8 +174,6 @@ def test_filter_courses_by_category_none(create_course):
     """Test that None category_id returns all courses"""
     course1 = create_course(course_code='CRS017')
     course2 = create_course(course_code='CRS018')
-
-    from courses.models import Course
 
     courses = Course.objects.all()
     filtered = filter_courses_by_category(courses, None)
@@ -355,3 +340,40 @@ def test_build_course_list_context_page_number(create_user, create_course):
 
     assert len(context['courses']) == 2  # Remaining courses on page 2
     assert context['page_obj'].number == 2
+
+
+def test_build_course_list_context_avoids_n_plus_one(
+    create_user,
+    create_category,
+    create_course,
+    create_enrollment,
+    django_assert_num_queries,
+):
+    """Course list context should not issue N queries per course.
+
+    This benchmark guards against accidental N+1 regressions when rendering
+    instructor and category data for many courses.
+    """
+
+    cache.clear()  # Clear cache to ensure consistent query count
+
+    user = create_user(email='bench@example.com', username='bench', role='student')
+    category = create_category(name='Backend')
+
+    # Create multiple courses sharing the same category and instructor
+    for i in range(10):
+        course = create_course(course_code=f'BENCH{i:03d}', title=f'Course {i}', is_active=True)
+        course.categories.set([category])
+        # Enroll the user in half of them to exercise enrollment-dependent context
+        if i % 2 == 0:
+            create_enrollment(student=user, course=course)
+
+    factory = RequestFactory()
+    request = factory.get('/courses/')
+    request.user = user
+
+    # The number of queries should stay constant regardless of course count
+    with django_assert_num_queries(5):
+        context = build_course_list_context(request, view='all')
+        # Access the courses to trigger query execution
+        len(context['courses'])

@@ -23,6 +23,7 @@ def create_user():
         first_name='Test',
         last_name='User',
         password='StrongPass123',
+        is_active=True,
         **extra,
     ):
         from django.contrib.auth import get_user_model
@@ -34,6 +35,7 @@ def create_user():
             first_name=first_name,
             last_name=last_name,
             password=password,
+            is_active=is_active,
             **extra,
         )
         return user

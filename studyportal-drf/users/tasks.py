@@ -11,11 +11,18 @@ import sentry_sdk
 from celery import shared_task
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
+
+# Import here to avoid circular imports
+from django.db.models import Count, Q
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
+from core.choices import EnrollmentStatus
 from core.texts import EmailMessage, EmailSubject
+from courses.models import Course
+from enrollments.models import Enrollment
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +41,6 @@ def _get_user_by_id(user_id, error_context=''):
     Raises:
         User.DoesNotExist: If user is not found
     """
-    from django.contrib.auth import get_user_model
 
     user_model = get_user_model()
 
@@ -201,26 +207,67 @@ def auto_enroll_intro_courses(self, user_id):
                 }
             )
 
-            # Import here to avoid circular imports
-            from core.choices import EnrollmentStatus
-            from courses.models import Course
-            from enrollments.models import Enrollment
-
             # Find introduction courses that are active and open for enrollment
+            # Annotate active enrollment counts to avoid N+1 when checking capacity.
             intro_courses = Course.objects.filter(
                 is_introduction=True,
                 is_active=True,
                 status=Course.STATUS_ACTIVE,
+            ).annotate(
+                enrolled_count=Count(
+                    'enrollments',
+                    filter=Q(enrollments__is_active=True),
+                    distinct=True,
+                )
             )
 
-            enrolled_count = 0
+            if not intro_courses:
+                logger.info('No introduction courses found for auto-enrollment')
+                return
+
+            # Fetch existing active enrollments for this user in a single query
+            existing_course_ids = set(
+                Enrollment.objects.filter(
+                    student=user,
+                    course__in=intro_courses,
+                    is_active=True,
+                ).values_list('course_id', flat=True)
+            )
+
+            to_create = []
             for course in intro_courses:
-                _, created = Enrollment.objects.get_or_create(
-                    student=user, course=course, defaults={'status': EnrollmentStatus.ACTIVE}
+                # Skip if already enrolled
+                if course.id in existing_course_ids:
+                    continue
+
+                # Respect course capacity using annotated enrolled_count
+                if course.max_students is not None and course.enrolled_count >= course.max_students:
+                    continue
+
+                # Final guard using can_enroll() (no extra queries thanks to annotations)
+                if not course.can_enroll():
+                    continue
+
+                to_create.append(
+                    Enrollment(
+                        student=user,
+                        course=course,
+                        status=EnrollmentStatus.ACTIVE,
+                    )
                 )
-                if created:
-                    enrolled_count += 1
-                    logger.info(f'Auto-enrolled {user.email} in course: {course.title}')
+
+            if not to_create:
+                logger.info(
+                    'User already enrolled or no available intro courses for auto-enrollment'
+                )
+                return
+
+            # Bulk-create enrollments in one DB round-trip
+            created_enrollments = Enrollment.objects.bulk_create(to_create)
+            enrolled_count = len(created_enrollments)
+
+            for enrollment in created_enrollments:
+                logger.info(f'Auto-enrolled {user.email} in course: {enrollment.course.title}')
 
             logger.info(f'Auto-enrolled user {user.email} in {enrolled_count} courses')
 

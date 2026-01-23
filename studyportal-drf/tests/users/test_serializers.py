@@ -1,11 +1,16 @@
+from datetime import timedelta
+from uuid import uuid4
+
 import pytest
 
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
 
 from users.api.serializers import (
     ChangePasswordSerializer,
+    EmailVerificationSerializer,
     PasswordResetConfirmSerializer,
     UserLoginSerializer,
     UserRegistrationSerializer,
@@ -160,3 +165,70 @@ def test_change_password_serializer_rejects_same_password(api_client, create_use
 
     assert serializer.is_valid() is False
     assert 'new_password' in serializer.errors
+
+
+def test_email_verification_serializer_valid_token(create_user):
+    """Test email verification with valid token"""
+
+    user = create_user(email='verify@example.com', username='verify', is_active=False)
+    token = user.generate_verification_token()
+
+    serializer = EmailVerificationSerializer(data={'user_id': str(user.id), 'token': token})
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data['user'] == user
+
+
+def test_email_verification_serializer_invalid_user_id():
+    """Test email verification with invalid user ID"""
+    serializer = EmailVerificationSerializer(data={'user_id': 'invalid-uuid', 'token': 'sometoken'})
+    assert serializer.is_valid() is False
+    assert 'user_id' in serializer.errors
+
+
+def test_email_verification_serializer_nonexistent_user():
+    """Test email verification with nonexistent user"""
+    serializer = EmailVerificationSerializer(
+        data={'user_id': str(uuid4()), 'token': 'sometokenlongenoughtomeetminimumlength'}
+    )
+    assert serializer.is_valid() is False
+    assert 'detail' in serializer.errors
+
+
+def test_email_verification_serializer_already_active_user(create_user):
+    """Test email verification for already active user"""
+    user = create_user(email='active@example.com', username='active', is_active=True)
+    token = user.generate_verification_token()
+
+    serializer = EmailVerificationSerializer(data={'user_id': str(user.id), 'token': token})
+    assert serializer.is_valid() is False
+    assert 'detail' in serializer.errors
+
+
+def test_email_verification_serializer_invalid_token(create_user):
+    """Test email verification with invalid token"""
+
+    user = create_user(email='invalid@example.com', username='invalid', is_active=False)
+
+    serializer = EmailVerificationSerializer(
+        data={'user_id': str(user.id), 'token': 'invalidtokenlongenoughtomeetminimumlength'}
+    )
+    assert serializer.is_valid() is False
+    assert 'detail' in serializer.errors
+
+
+def test_email_verification_serializer_expired_token(create_user, settings):
+    """Test email verification with expired token"""
+
+    # Set expiry to 1 hour for test
+    settings.EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS = 1
+
+    user = create_user(email='expired@example.com', username='expired', is_active=False)
+    token = user.generate_verification_token()
+
+    # Make token old
+    user.email_verification_token_created = timezone.now() - timedelta(hours=2)
+    user.save()
+
+    serializer = EmailVerificationSerializer(data={'user_id': str(user.id), 'token': token})
+    assert serializer.is_valid() is False
+    assert 'detail' in serializer.errors

@@ -54,7 +54,9 @@ def filter_courses_by_category(courses, category_id):
 
 
 def get_courses(user, view, query, category_id):
-    courses = Course.objects.prefetch_related('categories')
+    # Optimized queryset for course list pages to avoid N+1 when rendering
+    # instructor and category data.
+    courses = Course.objects.select_related('instructor').prefetch_related('categories')
 
     # Filter by user type
     courses = filter_courses_by_user(courses, user)

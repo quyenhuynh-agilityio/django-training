@@ -105,8 +105,15 @@ class Course(models.Model):
         db_table = 'courses'
         ordering = ['-created_at']
         indexes = [
+            # Fast lookup by unique code
             models.Index(fields=['course_code']),
+            # Common filtering in APIs: status + is_active
             models.Index(fields=['status', 'is_active']),
+            # Auto-enrollment & intro course queries
+            models.Index(fields=['is_introduction', 'is_active', 'status']),
+            models.Index(fields=['is_auto_enrolled', 'is_active']),
+            # Instructor "my_courses" queries
+            models.Index(fields=['instructor', 'is_active']),
         ]
 
     def __str__(self):
