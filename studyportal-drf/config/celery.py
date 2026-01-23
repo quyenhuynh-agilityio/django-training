@@ -1,12 +1,13 @@
 import os
 
-import sentry_sdk
 from celery import Celery
 from celery.signals import (
     task_failure,
     task_retry,
     task_success,
 )
+
+from core.sentry import sentry_add_breadcrumb, sentry_scope
 
 # Set default Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
@@ -38,40 +39,35 @@ def handle_task_failure(
     **extra_kwargs,
 ):
     """Capture task failures in Sentry with full context"""
-    with sentry_sdk.push_scope() as scope:
-        scope.set_context(
-            'celery-task',
-            {
-                'task': sender.name,
-                'task_id': task_id,
-                'args': args,
-                'kwargs': kwargs,
-            },
-        )
-        scope.set_tag('celery_task_name', sender.name)
-        scope.set_tag('celery_task_id', task_id)
-        sentry_sdk.capture_exception(exception)
+    # Note: keep Sentry capture here even if individual tasks also capture,
+    # since this is a last-resort hook for unhandled task errors.
+    with sentry_scope(
+        tags={'celery_task_name': sender.name, 'celery_task_id': task_id, 'module': 'celery'},
+        contexts={
+            'celery-task': {'task': sender.name, 'task_id': task_id, 'args': args, 'kwargs': kwargs}
+        },
+    ):
+        # Capture directly to avoid nested scopes.
+        import sentry_sdk as _sentry_sdk
+
+        _sentry_sdk.capture_exception(exception)
 
 
 @task_retry.connect
 def handle_task_retry(sender=None, task_id=None, reason=None, einfo=None, **kwargs):
     """Log task retries to Sentry as breadcrumbs"""
-    sentry_sdk.add_breadcrumb(
+    sentry_add_breadcrumb(
         category='celery',
         message=f'Task {sender.name} retry',
         level='warning',
-        data={
-            'task_id': task_id,
-            'reason': str(reason),
-            'task_name': sender.name,
-        },
+        data={'task_id': task_id, 'reason': str(reason), 'task_name': sender.name},
     )
 
 
 @task_success.connect
 def handle_task_success(sender=None, result=None, **kwargs):
     """Log successful task completions as breadcrumbs"""
-    sentry_sdk.add_breadcrumb(
+    sentry_add_breadcrumb(
         category='celery',
         message=f'Task {sender.name} succeeded',
         level='info',

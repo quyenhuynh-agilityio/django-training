@@ -35,7 +35,7 @@ dependencies = [
     "django-celery-beat>=2.5.0",
     "django-celery-results>=2.5.0",
     # NEW: Monitoring
-    "sentry-sdk>=1.39.0",
+    "sentry-sdk[django]>=1.39.0",
 ]
 
 [dependency-groups]

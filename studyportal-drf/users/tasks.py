@@ -7,7 +7,6 @@ Tasks include retry logic and Sentry error tracking.
 
 import logging
 
-import sentry_sdk
 from celery import shared_task
 
 from django.conf import settings
@@ -20,6 +19,12 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 from core.choices import EnrollmentStatus
+from core.sentry import (
+    sentry_add_breadcrumb,
+    sentry_capture_exception,
+    sentry_capture_message,
+    sentry_scope,
+)
 from core.texts import EmailMessage, EmailSubject
 from courses.models import Course
 from enrollments.models import Enrollment
@@ -49,7 +54,12 @@ def _get_user_by_id(user_id, error_context=''):
     except user_model.DoesNotExist:
         context_msg = f' for {error_context}' if error_context else ''
         logger.error(f'User {user_id} not found{context_msg}')
-        sentry_sdk.capture_message(f'User {user_id} not found{context_msg}', level='error')
+        sentry_capture_message(
+            f'User {user_id} not found{context_msg}',
+            level='error',
+            tags={'module': 'users', 'task_name': 'user_lookup'},
+            contexts={'task_data': {'user_id': str(user_id), 'error_context': error_context}},
+        )
         raise
 
 
@@ -71,22 +81,11 @@ def _send_email_with_context(user, subject, template_name, context, sentry_tag, 
     Raises:
         Exception: If email sending fails
     """
-    with sentry_sdk.push_scope() as scope:
-        scope.set_tag('task_name', sentry_tag)
-        scope.set_context(
-            'task_data',
-            {
-                'user_id': str(user.id),
-                'email': user.email,
-            },
-        )
-        scope.set_user(
-            {
-                'id': str(user.id),
-                'email': user.email,
-            }
-        )
-
+    with sentry_scope(
+        tags={'task_name': sentry_tag, 'module': 'users'},
+        contexts={'task_data': {'user_id': str(user.id), 'email': user.email}},
+        user={'id': str(user.id), 'email': user.email},
+    ):
         try:
             html_message = render_to_string(template_name, context)
             plain_message = strip_tags(html_message)
@@ -104,7 +103,12 @@ def _send_email_with_context(user, subject, template_name, context, sentry_tag, 
 
         except Exception as e:
             logger.error(f'Failed to send email to {user.email}: {str(e)}')
-            sentry_sdk.capture_exception(e)
+            sentry_capture_exception(
+                e,
+                tags={'task_name': sentry_tag, 'module': 'users'},
+                contexts={'task_data': {'user_id': str(user.id), 'email': user.email}},
+                user={'id': str(user.id), 'email': user.email},
+            )
             raise
 
 
@@ -141,10 +145,11 @@ def send_verification_email(self, user_id, token):
     )
 
     # Record success in Sentry
-    sentry_sdk.add_breadcrumb(
+    sentry_add_breadcrumb(
         category='email',
         message=str(EmailMessage.VERIFICATION_SENT),
         level='info',
+        data={'task_name': 'send_verification_email', 'user_id': str(user.id)},
     )
 
 
@@ -195,18 +200,12 @@ def auto_enroll_intro_courses(self, user_id):
 
     user = _get_user_by_id(user_id, error_context='auto-enrollment')
 
-    with sentry_sdk.push_scope() as scope:
-        scope.set_tag('task_name', 'auto_enroll_intro_courses')
-        scope.set_context('task_data', {'user_id': user_id})
-
+    with sentry_scope(
+        tags={'task_name': 'auto_enroll_intro_courses', 'module': 'users'},
+        contexts={'task_data': {'user_id': str(user_id)}},
+        user={'id': str(user.id), 'email': user.email},
+    ):
         try:
-            scope.set_user(
-                {
-                    'id': str(user.id),
-                    'email': user.email,
-                }
-            )
-
             # Find introduction courses that are active and open for enrollment
             # Annotate active enrollment counts to avoid N+1 when checking capacity.
             intro_courses = Course.objects.filter(
@@ -272,16 +271,21 @@ def auto_enroll_intro_courses(self, user_id):
             logger.info(f'Auto-enrolled user {user.email} in {enrolled_count} courses')
 
             # Track enrollment metrics in Sentry
-            sentry_sdk.add_breadcrumb(
+            sentry_add_breadcrumb(
                 category='enrollment',
                 message=str(EmailMessage.AUTO_ENROLLED).format(count=enrolled_count),
                 level='info',
-                data={'enrolled_count': enrolled_count},
+                data={'enrolled_count': enrolled_count, 'user_id': str(user.id)},
             )
 
         except Exception as e:
             logger.error(f'Failed to auto-enroll user {user_id}: {str(e)}')
-            sentry_sdk.capture_exception(e)
+            sentry_capture_exception(
+                e,
+                tags={'task_name': 'auto_enroll_intro_courses', 'module': 'users'},
+                contexts={'task_data': {'user_id': str(user_id)}},
+                user={'id': str(user.id), 'email': user.email},
+            )
             raise
 
 

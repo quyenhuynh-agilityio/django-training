@@ -11,7 +11,6 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 
-import sentry_sdk
 from celery import shared_task
 
 from django.conf import settings
@@ -21,6 +20,12 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
 
+from core.sentry import (
+    sentry_add_breadcrumb,
+    sentry_capture_exception,
+    sentry_capture_message,
+    sentry_scope,
+)
 from core.texts import EmailSubject
 from courses.models import Course
 
@@ -39,23 +44,20 @@ def _send_course_email_with_context(
         logger.warning(f'No recipient email found for course {course.id} ({sentry_tag})')
         return
 
-    with sentry_sdk.push_scope() as scope:
-        scope.set_tag('task_name', sentry_tag)
-        scope.set_context(
-            'task_data',
-            {
+    with sentry_scope(
+        tags={'task_name': sentry_tag, 'module': 'courses'},
+        contexts={
+            'task_data': {
                 'course_id': str(course.id),
                 'course_title': course.title,
                 'recipient_email': recipient_email,
-            },
-        )
-        scope.set_user(
-            {
-                'id': str(course.instructor.id) if course.instructor else None,
-                'email': recipient_email,
             }
-        )
-
+        },
+        user={
+            'id': str(course.instructor.id) if course.instructor else None,
+            'email': recipient_email,
+        },
+    ):
         try:
             html_message = render_to_string(template_name, context)
             plain_message = strip_tags(html_message)
@@ -75,7 +77,17 @@ def _send_course_email_with_context(
             logger.error(
                 f'Failed to send email to {recipient_email} for course {course.title}: {str(e)}'
             )
-            sentry_sdk.capture_exception(e)
+            sentry_capture_exception(
+                e,
+                tags={'task_name': sentry_tag, 'module': 'courses'},
+                contexts={
+                    'task_data': {
+                        'course_id': str(course.id),
+                        'course_title': course.title,
+                        'recipient_email': recipient_email,
+                    }
+                },
+            )
             raise
 
 
@@ -106,7 +118,14 @@ def send_course_full_email(self, course_id):
         if not course.instructor or not course.instructor.email:
             msg = f'Instructor info missing for course {course.id} capacity alert.'
             logger.warning(msg)
-            sentry_sdk.capture_message(msg, level='warning')
+            sentry_capture_message(
+                msg,
+                level='warning',
+                tags={'task_name': 'send_course_full_email', 'module': 'courses'},
+                contexts={
+                    'task_data': {'course_id': str(course.id), 'course_code': course.course_code}
+                },
+            )
             return
 
         context = {
@@ -127,20 +146,30 @@ def send_course_full_email(self, course_id):
         )
 
         # Record success in Sentry
-        sentry_sdk.add_breadcrumb(
+        sentry_add_breadcrumb(
             category='email',
             message=f'Capacity alert sent for {course.course_code}',
             level='info',
+            data={'task_name': 'send_course_full_email', 'course_id': str(course.id)},
         )
 
     except Course.DoesNotExist:
         msg = f'Course {course_id} not found for full enrollment notification.'
         logger.error(msg)
-        sentry_sdk.capture_message(msg, level='error')
+        sentry_capture_message(
+            msg,
+            level='error',
+            tags={'task_name': 'send_course_full_email', 'module': 'courses'},
+            contexts={'task_data': {'course_id': str(course_id)}},
+        )
         # No retry if the object doesn't exist
     except Exception as exc:
         logger.error(f'Unexpected error in send_course_full_email for {course_id}: {exc}')
-        sentry_sdk.capture_exception(exc)
+        sentry_capture_exception(
+            exc,
+            tags={'task_name': 'send_course_full_email', 'module': 'courses'},
+            contexts={'task_data': {'course_id': str(course_id)}},
+        )
         raise self.retry(exc=exc)  # noqa: B904
 
 
@@ -174,23 +203,17 @@ def _send_instructor_monthly_report(instructor, csv_content, report_label):
         logger.warning('No email found for instructor %s in monthly report task', instructor.id)
         return
 
-    with sentry_sdk.push_scope() as scope:
-        scope.set_tag('task_name', 'send_monthly_enrollment_report')
-        scope.set_context(
-            'task_data',
-            {
+    with sentry_scope(
+        tags={'task_name': 'send_monthly_enrollment_report', 'module': 'courses'},
+        contexts={
+            'task_data': {
                 'instructor_id': str(instructor.id),
                 'instructor_email': recipient_email,
                 'report_period': report_label,
-            },
-        )
-        scope.set_user(
-            {
-                'id': str(instructor.id),
-                'email': recipient_email,
             }
-        )
-
+        },
+        user={'id': str(instructor.id), 'email': recipient_email},
+    ):
         subject = str(EmailSubject.MONTHLY_ENROLLMENT_REPORT)
         instructor_name = getattr(instructor, 'full_name', None) or recipient_email
         body = (
@@ -304,6 +327,17 @@ def send_monthly_enrollment_report(self, report_label=None):
         except Exception as e:
             logger.error(
                 f'Failed to send report to instructor {instructor.email}: {e}', exc_info=True
+            )
+            sentry_capture_exception(
+                e,
+                tags={'task_name': 'send_monthly_enrollment_report', 'module': 'courses'},
+                contexts={
+                    'task_data': {
+                        'instructor_id': str(instructor.id),
+                        'instructor_email': getattr(instructor, 'email', None),
+                        'report_period': report_label,
+                    }
+                },
             )
             # Continue with other instructors even if one fails
 

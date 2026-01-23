@@ -4,6 +4,7 @@ from celery import shared_task
 
 from django.core.cache import cache
 
+from core.sentry import sentry_capture_exception, sentry_scope
 from notifications.models import Notification, NotificationType
 
 logger = logging.getLogger(__name__)
@@ -43,19 +44,31 @@ def create_student_enrolled_notification(
             f'about student {student_email} in course {course_code}'
         )
 
-        notification = Notification.objects.create(
-            recipient_id=instructor_id,
-            type=NotificationType.STUDENT_ENROLLED,
-            payload={
-                'student_id': str(student_id),
-                'student_name': student_name,
-                'student_email': student_email,
-                'course_id': str(course_id),
-                'course_code': course_code,
-                'course_title': course_title,
-                'message': f'{student_name} has enrolled in {course_title}',
+        with sentry_scope(
+            tags={'task_name': 'create_student_enrolled_notification', 'module': 'notifications'},
+            contexts={
+                'task_data': {
+                    'instructor_id': str(instructor_id),
+                    'student_id': str(student_id),
+                    'student_email': student_email,
+                    'course_id': str(course_id),
+                    'course_code': course_code,
+                }
             },
-        )
+        ):
+            notification = Notification.objects.create(
+                recipient_id=instructor_id,
+                type=NotificationType.STUDENT_ENROLLED,
+                payload={
+                    'student_id': str(student_id),
+                    'student_name': student_name,
+                    'student_email': student_email,
+                    'course_id': str(course_id),
+                    'course_code': course_code,
+                    'course_title': course_title,
+                    'message': f'{student_name} has enrolled in {course_title}',
+                },
+            )
 
         # Invalidate instructor's unread count cache
         cache.delete(f'notification_unread_count_{instructor_id}')
@@ -65,6 +78,19 @@ def create_student_enrolled_notification(
 
     except Exception as e:
         logger.error(f'Failed to create enrollment notification: {e}', exc_info=True)
+        sentry_capture_exception(
+            e,
+            tags={'task_name': 'create_student_enrolled_notification', 'module': 'notifications'},
+            contexts={
+                'task_data': {
+                    'instructor_id': str(instructor_id),
+                    'student_id': str(student_id),
+                    'student_email': student_email,
+                    'course_id': str(course_id),
+                    'course_code': course_code,
+                }
+            },
+        )
         raise
 
 
@@ -96,25 +122,36 @@ def create_student_removed_notification(
     """
     try:
         logger.info(
-            f'Creating removal notification for student {student_id} ' f'from course {course_code}'
+            f'Creating removal notification for student {student_id} from course {course_code}'
         )
 
-        message = f'You have been removed from {course_title}'
-        if removed_by_name:
-            message += f' by {removed_by_name}'
-
-        notification = Notification.objects.create(
-            recipient_id=student_id,
-            type=NotificationType.STUDENT_REMOVED,
-            payload={
-                'course_id': str(course_id),
-                'course_code': course_code,
-                'course_title': course_title,
-                'removed_by': str(removed_by_id) if removed_by_id else None,
-                'removed_by_name': removed_by_name or 'System',
-                'message': message,
+        with sentry_scope(
+            tags={'task_name': 'create_student_removed_notification', 'module': 'notifications'},
+            contexts={
+                'task_data': {
+                    'student_id': str(student_id),
+                    'course_id': str(course_id),
+                    'course_code': course_code,
+                    'removed_by_id': str(removed_by_id) if removed_by_id else None,
+                }
             },
-        )
+        ):
+            message = f'You have been removed from {course_title}'
+            if removed_by_name:
+                message += f' by {removed_by_name}'
+
+            notification = Notification.objects.create(
+                recipient_id=student_id,
+                type=NotificationType.STUDENT_REMOVED,
+                payload={
+                    'course_id': str(course_id),
+                    'course_code': course_code,
+                    'course_title': course_title,
+                    'removed_by': str(removed_by_id) if removed_by_id else None,
+                    'removed_by_name': removed_by_name or 'System',
+                    'message': message,
+                },
+            )
 
         # Invalidate student's unread count cache
         cache.delete(f'notification_unread_count_{student_id}')
@@ -124,4 +161,16 @@ def create_student_removed_notification(
 
     except Exception as e:
         logger.error(f'Failed to create removal notification: {e}', exc_info=True)
+        sentry_capture_exception(
+            e,
+            tags={'task_name': 'create_student_removed_notification', 'module': 'notifications'},
+            contexts={
+                'task_data': {
+                    'student_id': str(student_id),
+                    'course_id': str(course_id),
+                    'course_code': course_code,
+                    'removed_by_id': str(removed_by_id) if removed_by_id else None,
+                }
+            },
+        )
         raise

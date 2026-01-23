@@ -60,7 +60,7 @@ class TestSendVerificationEmail:
         assert not mock_send_mail.called
 
     @patch('users.tasks.send_mail')
-    @patch('users.tasks.sentry_sdk')
+    @patch('core.sentry.sentry_sdk')
     def test_captures_exception_in_sentry(self, mock_sentry, mock_send_mail, create_user):
         """Test exceptions are captured in Sentry"""
 
