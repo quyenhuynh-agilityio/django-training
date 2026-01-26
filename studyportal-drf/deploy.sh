@@ -4,7 +4,7 @@
 set -e
 
 echo "--- 📥 Pulling latest changes from GitHub ---"
-git pull origin main
+git pull github drf-advanced
 
 echo "--- 📦 Syncing dependencies with uv ---"
 # uv sync ensures your .venv matches your uv.lock exactly
