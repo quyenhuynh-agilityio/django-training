@@ -17,8 +17,4 @@ echo "--- 🎨 Collecting static files for DRF ---"
 # This ensures the browsable API and Admin CSS work
 uv run python manage.py collectstatic --noinput
 
-echo "--- ♻️ Reloading Web App ---"
-# Touching the WSGI file forces PythonAnywhere to reload the app
-touch /var/www/quyenhuynh_pythonanywhere_com_wsgi.py
-
-echo "🚀 Deployment successful!"
+echo "🚀 Deployment tasks completed (migrations + collectstatic)."

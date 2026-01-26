@@ -36,6 +36,11 @@ dependencies = [
     "django-celery-results>=2.5.0",
     # NEW: Monitoring
     "sentry-sdk[django]>=1.39.0",
+    # Production WSGI server & static file handling
+    "gunicorn>=21.2.0",
+    "whitenoise>=6.7.0",
+    # DATABASE_URL helper for Render/PostgreSQL
+    "dj-database-url>=2.3.0",
 ]
 
 [dependency-groups]

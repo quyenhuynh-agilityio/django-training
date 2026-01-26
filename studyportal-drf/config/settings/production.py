@@ -1,3 +1,5 @@
+import dj_database_url
+
 from .base import *  # noqa: F403
 from .base import env
 
@@ -63,26 +65,41 @@ CORS_ALLOW_ALL_ORIGINS = False  # Never allow in production
 # ==============================
 # DATABASE
 # ==============================
-# Require all database settings (no defaults)
-required_db_vars = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST']
-missing_vars = [var for var in required_db_vars if not env(var, default='')]
-if missing_vars:
-    raise ValueError(f"Missing required database environment variables: {', '.join(missing_vars)}")
+# Prefer a single DATABASE_URL (e.g., from Render managed PostgreSQL)
+DATABASE_URL = env('DATABASE_URL', default='')
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DB_NAME'),
-        'USER': env('DB_USER'),
-        'PASSWORD': env('DB_PASSWORD'),
-        'HOST': env('DB_HOST'),
-        'PORT': env('DB_PORT', default='5432'),
-        'CONN_MAX_AGE': 600,  # Connection pooling - keeps connections alive for 10 minutes
-        'OPTIONS': {
-            'connect_timeout': 10,
-        },
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,  # Connection pooling - keeps connections alive for 10 minutes
+            ssl_require=env.bool('DB_SSL_REQUIRE', default=True),
+        )
     }
-}
+else:
+    # Fallback: require all individual database settings (no defaults)
+    required_db_vars = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST']
+    missing_vars = [var for var in required_db_vars if not env(var, default='')]
+    if missing_vars:
+        raise ValueError(
+            'Either DATABASE_URL must be set, or the following database environment '
+            f"variables must be provided: {', '.join(missing_vars)}"
+        )
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env('DB_NAME'),
+            'USER': env('DB_USER'),
+            'PASSWORD': env('DB_PASSWORD'),
+            'HOST': env('DB_HOST'),
+            'PORT': env('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
+        }
+    }
 
 # ==============================
 # EMAIL
