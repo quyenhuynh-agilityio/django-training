@@ -26,10 +26,7 @@ class EnrollmentInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    """
-    Course Admin — UI-focused, safe, and scalable.
-    Uses cached statistics via CourseStatistics class.
-    """
+    """Course Admin with Introduction/Auto-Enrollment Management"""
 
     # ── List View ─────────────────────────────────────────────
     list_display = (
@@ -38,12 +35,22 @@ class CourseAdmin(admin.ModelAdmin):
         'instructor_link',
         'status_badge',
         'enrollment_info',
+        'is_introduction',
+        'is_auto_enrolled',
         'categories_list',
-        'is_active_badge',
+        'is_active',
         'created_at',
     )
 
-    list_filter = ('status', 'is_active', 'categories', 'created_at')
+    list_filter = (
+        'is_introduction',
+        'is_auto_enrolled',
+        'status',
+        'is_active',
+        'categories',
+        'created_at',
+    )
+
     search_fields = (
         'title',
         'course_code',
@@ -95,6 +102,17 @@ class CourseAdmin(admin.ModelAdmin):
             },
         ),
         (
+            _('Auto-Enrollment'),
+            {
+                'description': _(
+                    'Introduction Course: Tag for beginner/intro courses (organization only). '
+                    'Auto-Enroll: Automatically enroll new students when they verify email. '
+                    'Note: Auto-enrollment only works for Active courses.'
+                ),
+                'fields': ('is_introduction', 'is_auto_enrolled'),
+            },
+        ),
+        (
             _('Enrollment Details'),
             {
                 'classes': ('collapse',),
@@ -102,12 +120,8 @@ class CourseAdmin(admin.ModelAdmin):
             },
         ),
         (
-            _('System-Wide Statistics (Cached)'),
+            _('Statistics'),
             {
-                'description': _(
-                    'These statistics are cached and updated every '
-                    'STATISTICS_CACHE_TIMEOUT seconds for performance.'
-                ),
                 'fields': ('display_average_enrollment', 'display_top_courses'),
             },
         ),
@@ -125,6 +139,10 @@ class CourseAdmin(admin.ModelAdmin):
         'deactivate_courses',
         'set_to_active_status',
         'set_instructor',
+        'enable_introduction',
+        'disable_introduction',
+        'enable_auto_enrollment',
+        'disable_auto_enrollment',
     )
 
     # ─────────────────────────────────────────────────────────
@@ -146,7 +164,7 @@ class CourseAdmin(admin.ModelAdmin):
         )
 
     # ─────────────────────────────────────────────────────────
-    # Display Helpers (UI-only)
+    # Display Helpers
     # ─────────────────────────────────────────────────────────
 
     @admin.display(description=_('Instructor'), ordering='instructor__email')
@@ -165,16 +183,13 @@ class CourseAdmin(admin.ModelAdmin):
             Course.STATUS_IN_PROGRESS: '#007bff',
             Course.STATUS_COMPLETED: '#17a2b8',
         }
-
         return status_badge(obj.get_status_display(), obj.status, colors)
 
     @admin.display(description=_('Enrollments'))
     def enrollment_info(self, obj):
         count = getattr(obj, 'active_enrollments', 0)
         max_students = obj.max_students or '∞'
-
         color = '#dc3545' if obj.is_full else '#28a745' if count else '#6c757d'
-
         return format_html(
             '<span style="color:{}; font-weight:600;">{}/{}</span>',
             color,
@@ -185,7 +200,6 @@ class CourseAdmin(admin.ModelAdmin):
     @admin.display(description=_('Categories'))
     def categories_list(self, obj):
         categories = list(obj.categories.all()[:3])
-
         if not categories:
             return format_html('<span style="color:#999;">—</span>')
 
@@ -204,13 +218,8 @@ class CourseAdmin(admin.ModelAdmin):
 
         return format_html(''.join(badges))
 
-    @admin.display(description=_('Active'), boolean=True)
-    def is_active_badge(self, obj):
-        return obj.is_active
-
     @admin.display(description=_('Enrollment Statistics'))
     def enrollment_stats(self, obj):
-        """Per-course enrollment breakdown (not cached - always fresh)."""
         if not obj.pk:
             return _('Save course to view statistics')
 
@@ -229,62 +238,31 @@ class CourseAdmin(admin.ModelAdmin):
             qs.filter(status=Enrollment.STATUS_DROPPED).count(),
         )
 
-    @admin.display(description=_('Average Enrollment (All Courses)'))
+    @admin.display(description=_('Average Enrollment'))
     def display_average_enrollment(self, obj):
-        """Display cached system-wide average enrollment."""
         stats = CourseStatistics.get_average_enrollments()
-
         return format_html(
-            '<div style="padding:10px; background:#f8f9fa; border-radius:4px;">'
-            '<div style="font-size:24px; font-weight:600; color:#28a745;">{:.2f}</div>'
-            '<div style="font-size:11px; color:#999; margin-top:5px;">'
-            '{} courses | {} enrollments'
-            '</div>'
-            '</div>',
+            '{:.2f} avg ({} courses, {} enrollments)',
             stats['average'],
             stats['total_courses'],
             stats['total_enrollments'],
         )
 
-    @admin.display(description=_('Top 5 Courses by Enrollment'))
+    @admin.display(description=_('Top 5 Courses'))
     def display_top_courses(self, obj):
-        """
-        Top courses by enrollment count.
-        Uses cached data from CourseStatistics for performance.
-        Cache refreshes every STATISTICS_CACHE_TIMEOUT seconds.
-        """
         top_courses = CourseStatistics.get_top_courses(limit=5)
-
         if not top_courses:
-            return format_html(
-                '<span style="color:#999; font-style:italic;">No courses yet.</span>'
-            )
+            return '—'
 
         items = []
-        for course in top_courses:  # ✅ Removed unused idx
-            # Use annotated enrollment_count from statistics
+        for course in top_courses:
             count = getattr(course, 'enrollment_count', 0)
+            items.append(f'{course.title} ({count})')
 
-            items.append(
-                format_html(
-                    '<li style="padding:5px 0; border-bottom:1px solid #eee;">'
-                    '<strong>{}</strong> '
-                    '<span style="color:#28a745; font-weight:600;">({} enrollments)</span>'
-                    '</li>',
-                    course.title,
-                    count,
-                )
-            )
-
-        return format_html(
-            '<div style="padding:10px; background:#f8f9fa; border-radius:4px;">'
-            '<ul style="list-style:none; padding:0; margin:0;">{}</ul>'
-            '</div>',
-            ''.join(items),
-        )
+        return format_html('<br>'.join(items))
 
     # ─────────────────────────────────────────────────────────
-    # Save Validation (Admin-only guardrail)
+    # Save Validation
     # ─────────────────────────────────────────────────────────
 
     def save_model(self, request, obj, form, change):
@@ -302,6 +280,15 @@ class CourseAdmin(admin.ModelAdmin):
                     _('Cannot deactivate an in-progress course with active enrollments.'),
                 )
                 return
+
+        # Warn about auto-enrollment on inactive courses
+        if obj.is_auto_enrolled and (not obj.is_active or obj.status != Course.STATUS_ACTIVE):
+            messages.warning(
+                request,
+                _(
+                    'Auto-enrollment enabled but course is not Active. Auto-enrollment will not work until course is activated.'
+                ),
+            )
 
         super().save_model(request, obj, form, change)
 
@@ -369,3 +356,54 @@ class CourseAdmin(admin.ModelAdmin):
             'action_checkbox_name': admin.ACTION_CHECKBOX_NAME,
         }
         return TemplateResponse(request, 'admin/courses/course/set_instructor.html', context)
+
+    # ─────────────────────────────────────────────────────────
+    # Introduction/Auto-Enrollment Actions
+    # ─────────────────────────────────────────────────────────
+
+    @admin.action(description=_('Mark as Introduction Course'))
+    def enable_introduction(self, request, queryset):
+        updated = queryset.update(is_introduction=True)
+        self.message_user(
+            request,
+            _('{count} course(s) marked as Introduction.').format(count=updated),
+            messages.SUCCESS,
+        )
+
+    @admin.action(description=_('Remove Introduction Tag'))
+    def disable_introduction(self, request, queryset):
+        updated = queryset.update(is_introduction=False)
+        self.message_user(
+            request,
+            _('{count} course(s) no longer marked as Introduction.').format(count=updated),
+            messages.SUCCESS,
+        )
+
+    @admin.action(description=_('Enable Auto-Enrollment'))
+    def enable_auto_enrollment(self, request, queryset):
+        inactive = queryset.filter(Q(is_active=False) | ~Q(status=Course.STATUS_ACTIVE))
+
+        if inactive.exists():
+            self.message_user(
+                request,
+                _(
+                    '{count} course(s) are not Active. Auto-enrollment will only work when courses are Active.'
+                ).format(count=inactive.count()),
+                messages.WARNING,
+            )
+
+        updated = queryset.update(is_auto_enrolled=True)
+        self.message_user(
+            request,
+            _('Auto-enrollment enabled for {count} course(s).').format(count=updated),
+            messages.SUCCESS,
+        )
+
+    @admin.action(description=_('Disable Auto-Enrollment'))
+    def disable_auto_enrollment(self, request, queryset):
+        updated = queryset.update(is_auto_enrolled=False)
+        self.message_user(
+            request,
+            _('Auto-enrollment disabled for {count} course(s).').format(count=updated),
+            messages.SUCCESS,
+        )

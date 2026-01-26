@@ -184,6 +184,11 @@ DB_PASSWORD=your_password
 DB_HOST=localhost
 DB_PORT=5432
 
+# Redis / Celery (defaults match settings.base)
+REDIS_URL=redis://localhost:6379/0
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+
 # Django Configuration
 SECRET_KEY=your-secret-key-here
 DEBUG=True
@@ -225,6 +230,55 @@ DJANGO_SETTINGS_MODULE=config.settings.production uv run python manage.py runser
 ```
 
 The server will start at `http://localhost:8000/`
+
+### Background workers: Redis, Celery, Celery Beat
+
+This project uses **Redis** as cache and Celery broker/result backend, plus **Celery** and
+**Celery Beat** for background jobs (emails, notifications, reports).
+
+1. **Start Redis** (choose one):
+
+   - Using Homebrew (macOS):
+
+     ```bash
+     brew install redis
+     brew services start redis
+     ```
+
+   - Or using Docker:
+
+     ```bash
+     docker run --name studyportal-redis -p 6379:6379 -d redis:7
+     ```
+
+2. **Start Celery worker** (in a new terminal):
+
+   ```bash
+   cd studyportal-drf
+   DJANGO_SETTINGS_MODULE=config.settings.local \
+     uv run celery -A config worker -l info
+   ```
+
+3. **Start Celery Beat scheduler** (in another terminal):
+
+   ```bash
+   cd studyportal-drf
+   DJANGO_SETTINGS_MODULE=config.settings.local \
+     uv run celery -A config beat -l info
+   ```
+
+   Celery Beat uses the schedules defined in `CELERY_BEAT_SCHEDULE` inside
+   `config/settings/base.py` (e.g. weekly cleanup, monthly reports).
+
+4. **Optional: Monitor tasks with Flower** (dev only):
+
+   ```bash
+   cd studyportal-drf
+   DJANGO_SETTINGS_MODULE=config.settings.local \
+     uv run celery -A config flower --port=5555
+   ```
+
+   Then open `http://localhost:5555` to see task status and history.
 
 ## 🧪 Testing
 

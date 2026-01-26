@@ -20,11 +20,14 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 
+from django.conf import settings
+from django.core.cache import cache
 from django.db.models import BooleanField, Case, Count, F, Q, Value, When
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
 from core.api_views import CommonViewSet
 from core.permissions import IsCourseInstructor, IsInstructor
@@ -643,6 +646,34 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
     # ═══════════════════════════════════════════════════════════════════════════
     #   C R U D  O P E R A T I O N S  (WITH RESPONSE VALIDATION)
     # ═══════════════════════════════════════════════════════════════════════════
+
+    def list(self, request, *args, **kwargs):  # noqa: D401
+        """List courses with optional caching for public queries."""
+        # Do not cache instructor-specific "my courses" view
+        if (
+            request.user.is_authenticated
+            and getattr(request.user, 'is_instructor', False)
+            and request.query_params.get('my_courses') == 'true'
+        ):
+            return super().list(request, *args, **kwargs)
+
+        # Build cache key from query parameters that affect the queryset
+        relevant_params = ['page', 'search', 'status', 'category', 'ordering']
+        key_parts = [f"{name}={request.query_params.get(name, '')}" for name in relevant_params]
+        cache_key = 'courses:list:' + ':'.join(key_parts)
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        response = super().list(request, *args, **kwargs)
+
+        # Cache successful responses only
+        if response.status_code == 200:
+            timeout = getattr(settings, 'COURSE_LIST_CACHE_TIMEOUT', 60)
+            cache.set(cache_key, response.data, timeout)
+
+        return response
 
     def perform_create(self, serializer):
         """
