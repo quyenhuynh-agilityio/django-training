@@ -1,0 +1,48 @@
+services:
+  # 1. Django Web Service
+  - type: web
+    name: studyportal-api
+    runtime: python
+    plan: free
+    rootDir: studyportal-drf
+    # Install uv, sync dependencies from pyproject.toml, then migrate
+    buildCommand: |
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+      source $HOME/.cargo/env
+      uv sync --frozen
+      source .venv/bin/activate
+      python manage.py collectstatic --no-input
+      python manage.py migrate
+    # Use the venv created by uv to run gunicorn
+    startCommand: "source .venv/bin/activate && gunicorn core.wsgi:application"
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: 3.11.0 # Match this to your pyproject.toml version
+
+  # 2. Celery Worker
+  - type: worker
+    name: studyportal-worker
+    runtime: python
+    plan: starter
+    rootDir: studyportal-drf
+    buildCommand: |
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+      source $HOME/.cargo/env
+      uv sync --frozen
+    startCommand: "source .venv/bin/activate && celery -A core worker --loglevel=info"
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+# 3. Redis Instance
+kv:
+  name: studyportal-redis
+  plan: free
