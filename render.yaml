@@ -51,7 +51,7 @@ services:
         value: ".onrender.com,localhost"
 
       - key: PYTHON_VERSION
-        value: "3.13"
+        value: "3.13.1"  # ← Changed from "3.13"
 
   # ============================================
   # Celery Worker (as Web Service - Free Tier)
@@ -102,7 +102,7 @@ services:
         sync: false
 
       - key: PYTHON_VERSION
-        value: "3.13"
+        value: "3.13.1"  # ← Changed from "3.13"
 
   # ============================================
   # Celery Beat (Optional - for scheduled tasks)
@@ -153,7 +153,7 @@ services:
         sync: false
 
       - key: PYTHON_VERSION
-        value: "3.13"
+        value: "3.13.1"  # ← Changed from "3.13"
 
   # ============================================
   # Redis (Message Broker + Cache)
