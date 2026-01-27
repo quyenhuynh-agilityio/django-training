@@ -1,47 +1,176 @@
 services:
-  # 1. The Redis Broker (Standard Service Type)
+  # ============================================
+  # Django Web Service
+  # ============================================
+  - type: web
+    name: studyportal-web
+    env: python
+    region: singapore
+    plan: free
+
+    # Build with uv
+    buildCommand: |
+      pip install uv
+      uv sync --frozen --no-dev
+      uv run python manage.py collectstatic --no-input
+      uv run python manage.py migrate --no-input
+
+    startCommand: uv run gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: studyportal-db
+          property: connectionString
+
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: DJANGO_SECRET_KEY
+        sync: false  # Set manually in Render dashboard
+
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost"
+
+      - key: PYTHON_VERSION
+        value: "3.13"
+
+  # ============================================
+  # Celery Worker (as Web Service - Free Tier)
+  # ============================================
+  - type: web
+    name: studyportal-worker
+    env: python
+    region: singapore
+    plan: free
+
+    buildCommand: |
+      pip install uv
+      uv sync --frozen --no-dev
+
+    # Trick: Run Celery + dummy HTTP server to keep service "alive"
+    startCommand: |
+      uv run celery -A config.celery.app worker --loglevel=info --concurrency=2 &
+      python -m http.server $PORT
+
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: studyportal-db
+          property: connectionString
+
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: DJANGO_SECRET_KEY
+        sync: false
+
+      - key: PYTHON_VERSION
+        value: "3.13"
+
+  # ============================================
+  # Celery Beat (Optional - for scheduled tasks)
+  # ============================================
+  - type: web
+    name: studyportal-beat
+    env: python
+    region: singapore
+    plan: free
+
+    buildCommand: |
+      pip install uv
+      uv sync --frozen --no-dev
+
+    startCommand: |
+      uv run celery -A config.celery.app beat --loglevel=info &
+      python -m http.server $PORT
+
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: studyportal-db
+          property: connectionString
+
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: studyportal-redis
+          property: connectionString
+
+      - key: DJANGO_SECRET_KEY
+        sync: false
+
+      - key: PYTHON_VERSION
+        value: "3.13"
+
+# ============================================
+# Database
+# ============================================
+databases:
+  - name: studyportal-db
+    databaseName: studyportal
+    user: studyportal
+    plan: free
+    region: singapore
+
+# ============================================
+# Redis (Message Broker + Cache)
+# ============================================
+services:
   - type: redis
     name: studyportal-redis
+    ipAllowList: []  # Private to Render services only
     plan: free
-    ipAllowList: [] # Limits access to internal services only
-
-  # 2. Django Web Service
-  - type: web
-    name: studyportal-api
-    runtime: python
-    plan: free
-    rootDir: studyportal-drf
-    buildCommand: |
-      curl -LsSf https://astral.sh/uv/install.sh | sh
-      source $HOME/.cargo/env
-      uv sync --frozen
-      source .venv/bin/activate
-      python manage.py collectstatic --no-input
-      python manage.py migrate
-    startCommand: "source .venv/bin/activate && gunicorn core.wsgi:application"
-    envVars:
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: studyportal-redis
-          property: connectionString
-      - key: PYTHON_VERSION
-        value: 3.11.0
-
-  # 3. Celery Worker
-  - type: worker
-    name: studyportal-worker
-    runtime: python
-    plan: starter
-    rootDir: studyportal-drf
-    buildCommand: |
-      curl -LsSf https://astral.sh/uv/install.sh | sh
-      source $HOME/.cargo/env
-      uv sync --frozen
-    startCommand: "source .venv/bin/activate && celery -A core worker --loglevel=info"
-    envVars:
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: studyportal-redis
-          property: connectionString
+    maxmemoryPolicy: allkeys-lru
+    region: singapore
