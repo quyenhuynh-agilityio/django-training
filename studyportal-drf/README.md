@@ -190,14 +190,14 @@ CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
 # Django Configuration
-SECRET_KEY=your-secret-key-here
+DJANGO_SECRET_KEY=your-secret-key-here
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 ```
 
-**Generate a secure SECRET_KEY:**
+**Generate a secure DJANGO_SECRET_KEY:**
 ```bash
-python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+python -c "from django.core.management.utils import get_random_DJANGO_SECRET_KEY; print(get_random_DJANGO_SECRET_KEY())"
 ```
 
 3. **Install dependencies**

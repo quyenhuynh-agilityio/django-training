@@ -11,10 +11,10 @@ DEBUG = False
 # ==============================
 # SECURITY: Require SECRET_KEY
 # ==============================
-secret_key_from_env = env('SECRET_KEY', default='')
+secret_key_from_env = env('DJANGO_SECRET_KEY', default='')
 if not secret_key_from_env or len(secret_key_from_env) < 40:
     raise ValueError(
-        'SECRET_KEY must be explicitly set in production environment with at least 40 characters! '
+        'DJANGO_SECRET_KEY must be explicitly set in production environment with at least 40 characters! '
         "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(50))'"
     )
 SECRET_KEY = secret_key_from_env

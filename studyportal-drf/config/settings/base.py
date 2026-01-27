@@ -32,7 +32,7 @@ DJANGO_ENV = env('DJANGO_ENV', default='local')
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 
 
-SECRET_KEY = env('SECRET_KEY', default=secrets.token_urlsafe(50))
+SECRET_KEY = env('DJANGO_SECRET_KEY', default=secrets.token_urlsafe(50))
 
 DEBUG = env('DEBUG')
 

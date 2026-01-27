@@ -939,7 +939,7 @@ Features:
 
 - [ ] Set `DEBUG=False`
 - [ ] Configure `ALLOWED_HOSTS`
-- [ ] Use strong `SECRET_KEY`
+- [ ] Use strong `DJANGO_SECRET_KEY`
 - [ ] Configure PostgreSQL database
 - [ ] Set up email backend (SMTP)
 - [ ] Configure CORS for mobile app
@@ -953,7 +953,7 @@ Features:
 ```env
 # Production
 DEBUG=False
-SECRET_KEY=<strong-secret-key>
+DJANGO_SECRET_KEY=<strong-secret-key>
 DB_NAME=studyportal_prod
 DB_USER=postgres
 DB_PASSWORD=<secure-password>
