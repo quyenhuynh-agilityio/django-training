@@ -269,6 +269,11 @@ CACHES = {
     }
 }
 
+# Centralized cache timeouts (seconds)
+COURSE_LIST_CACHE_TIMEOUT = 60
+STATISTICS_CACHE_TIMEOUT = 30
+NOTIFICATION_CACHE_TIMEOUT = 60
+
 # ============================================
 # SESSION CONFIGURATION (Optional: Use Redis)
 # ============================================

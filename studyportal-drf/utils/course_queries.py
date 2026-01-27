@@ -1,7 +1,7 @@
-from django.core.cache import cache
 from django.core.paginator import Paginator
 
 from categories.models import Category
+from core.cache import build_cache_key, cache_get_or_set, get_timeout
 from courses.models import Course
 from enrollments.models import Enrollment
 
@@ -21,14 +21,14 @@ def get_user_enrolled_ids(user):
 
 
 def get_all_categories():
-    # Try cache first to reduce DB queries (performance)
-    categories = cache.get(CATEGORY_CACHE_KEY)
-    if categories is None:
-        # Fetch all categories ordered alphabetically
-        categories = Category.objects.order_by('name').all()
-        # Cache for 5 minutes (short-lived to reflect changes in categories)
-        cache.set(CATEGORY_CACHE_KEY, categories, 300)
-    return categories
+    cache_key = build_cache_key(CATEGORY_CACHE_KEY)
+    timeout = get_timeout('CATEGORY_CACHE_TIMEOUT', 300)
+
+    return cache_get_or_set(
+        cache_key,
+        lambda: Category.objects.order_by('name').all(),
+        timeout=timeout,
+    )
 
 
 def filter_courses_by_user(courses, user):

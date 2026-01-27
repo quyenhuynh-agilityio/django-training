@@ -4,6 +4,7 @@ from celery import shared_task
 
 from django.core.cache import cache
 
+from core.cache import build_cache_key
 from core.sentry import sentry_capture_exception, sentry_scope
 from notifications.models import Notification, NotificationType
 
@@ -71,7 +72,7 @@ def create_student_enrolled_notification(
             )
 
         # Invalidate instructor's unread count cache
-        cache.delete(f'notification_unread_count_{instructor_id}')
+        cache.delete(build_cache_key('notification_unread_count', user_id=instructor_id))
 
         logger.info(f'Created notification {notification.id}')
         return {'status': 'success', 'notification_id': str(notification.id)}
@@ -154,7 +155,7 @@ def create_student_removed_notification(
             )
 
         # Invalidate student's unread count cache
-        cache.delete(f'notification_unread_count_{student_id}')
+        cache.delete(build_cache_key('notification_unread_count', user_id=student_id))
 
         logger.info(f'Created notification {notification.id}')
         return {'status': 'success', 'notification_id': str(notification.id)}

@@ -13,6 +13,7 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 
 from core.api_views import CommonViewSet
+from core.cache import build_cache_key
 from notifications.models import Notification
 
 from .serializers import (
@@ -169,7 +170,7 @@ class NotificationViewSet(CommonViewSet, viewsets.ReadOnlyModelViewSet):
         )
 
         # Clear cache
-        cache_key = f'notification_unread_count_{request.user.id}'
+        cache_key = build_cache_key('notification_unread_count', user_id=request.user.id)
         cache.delete(cache_key)
 
         response_data = {

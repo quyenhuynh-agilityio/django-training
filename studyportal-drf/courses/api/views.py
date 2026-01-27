@@ -20,7 +20,6 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db.models import BooleanField, Case, Count, F, Q, Value, When
 from rest_framework import viewsets
@@ -30,6 +29,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.api_views import CommonViewSet
+from core.cache import build_cache_key, get_timeout
 from core.permissions import IsCourseInstructor, IsInstructor
 from core.texts import ErrorMessage, SuccessMessage
 from courses.models import Course
@@ -659,8 +659,10 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         # Build cache key from query parameters that affect the queryset
         relevant_params = ['page', 'search', 'status', 'category', 'ordering']
-        key_parts = [f"{name}={request.query_params.get(name, '')}" for name in relevant_params]
-        cache_key = 'courses:list:' + ':'.join(key_parts)
+        cache_key = build_cache_key(
+            'courses:list',
+            **{name: request.query_params.get(name, '') for name in relevant_params},
+        )
 
         cached = cache.get(cache_key)
         if cached is not None:
@@ -670,7 +672,7 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
 
         # Cache successful responses only
         if response.status_code == 200:
-            timeout = getattr(settings, 'COURSE_LIST_CACHE_TIMEOUT', 60)
+            timeout = get_timeout('COURSE_LIST_CACHE_TIMEOUT', 60)
             cache.set(cache_key, response.data, timeout)
 
         return response

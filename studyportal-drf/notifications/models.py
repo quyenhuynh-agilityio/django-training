@@ -4,6 +4,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 
+from core.cache import build_cache_key, cache_get_or_set, get_timeout
 from core.choices import NotificationType
 from core.texts import HelpText
 
@@ -61,7 +62,7 @@ class Notification(models.Model):
             # Clear user's unread count cache
             from django.core.cache import cache
 
-            cache_key = f'notification_unread_count_{self.recipient_id}'
+            cache_key = build_cache_key('notification_unread_count', user_id=self.recipient_id)
             cache.delete(cache_key)
 
     @classmethod
@@ -70,18 +71,11 @@ class Notification(models.Model):
         Get cached unread notification count for user.
         Cache timeout: 60 seconds (configurable via settings).
         """
-        from django.core.cache import cache
+        cache_key = build_cache_key('notification_unread_count', user_id=user_id)
+        timeout = get_timeout('NOTIFICATION_CACHE_TIMEOUT', 60)
 
-        cache_key = f'notification_unread_count_{user_id}'
-        cached_count = cache.get(cache_key)
-
-        if cached_count is not None:
-            return cached_count
-
-        count = cls.objects.filter(recipient_id=user_id, is_read=False).count()
-
-        # Cache for 60 seconds
-        timeout = getattr(settings, 'NOTIFICATION_CACHE_TIMEOUT', 60)
-        cache.set(cache_key, count, timeout)
-
-        return count
+        return cache_get_or_set(
+            cache_key,
+            lambda: cls.objects.filter(recipient_id=user_id, is_read=False).count(),
+            timeout=timeout,
+        )
