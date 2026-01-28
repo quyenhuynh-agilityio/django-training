@@ -8,7 +8,7 @@ if [ "$CREATE_DJANGO_SUPERUSER" = "true" ]; then
 
     # Run the createsuperuser command with --no-input
     # Django will automatically pick up the credentials from the environment variables
-    python manage.py createsuperuser --no-input
+    uv run python manage.py createsuperuser --no-input
 else
     echo "Conditional superuser creation skipped."
 fi
