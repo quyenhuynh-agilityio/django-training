@@ -147,7 +147,9 @@ class ErrorMessage:
     COURSE_NOT_FOUND = _('Course not found.')
     CANNOT_ENROLL_IN_INACTIVE_COURSE = _('Cannot enroll in an inactive course.')
     CANNOT_ENROLL_WHEN_NOT_OPEN_TEMPLATE = _('Cannot enroll in a course that is %(status)s.')
-    COURSE_AT_CAPACITY = _('Course has reached maximum capacity.')
+    COURSE_AT_CAPACITY = _(
+        'Course has reached maximum capacity. Please choose another course or check back later.'
+    )
     ALREADY_ENROLLED = _('You are already enrolled in this course.')
     CANNOT_ENROLL_AT_THE_MOMENT = _('Cannot enroll in this course at the moment.')
 
@@ -163,7 +165,9 @@ class ErrorMessage:
         'This course is not open for enrollment. '
         'Only courses with "Active" status accept new enrollments.'
     )
-    COURSE_REACHED_MAX_CAPACITY = _('This course has reached maximum capacity.')
+    COURSE_REACHED_MAX_CAPACITY = _(
+        'This course has reached maximum capacity. Please choose another course or check back later.'
+    )
 
 
 class SuccessMessage:

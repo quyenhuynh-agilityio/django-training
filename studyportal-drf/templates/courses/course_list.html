@@ -70,6 +70,8 @@
                                        target="_blank"
                                        class="btn btn-primary watch-btn">Watch Video</a>
                                 {% endif %}
+                            {% elif course.is_full %}
+                                <button class="btn btn-primary">Full</button>
                             {% else %}
                                 <a href="{% url 'enroll_course' course.id %}" class="btn btn-primary">Enroll</a>
                             {% endif %}
