@@ -10,7 +10,7 @@ from utils.admin.badges import status_badge
 from utils.admin.display import admin_link
 
 from .models import Course
-from .statistics import course_stats
+from reports.statistics import course_stats
 
 
 class EnrollmentInline(admin.TabularInline):

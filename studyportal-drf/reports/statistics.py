@@ -1,6 +1,8 @@
 """
-Course statistics aggregation for dashboard and analytics.
-Uses Django caching to avoid recalculating on every request.
+Reporting/statistics services for courses and enrollments.
+
+This module is intentionally decoupled from the courses app so that
+all cross-cutting analytics and reporting logic can live in one place.
 """
 
 from datetime import timedelta
@@ -23,14 +25,6 @@ def get_statistics_cache_timeout():
 
 
 class CourseStatistics:
-    """
-    Computes dynamic statistics about courses and enrollments.
-    Used for: Admin dashboard, analytics API, instructor insights.
-
-    All methods use Django cache to prevent repeated DB queries.
-    Cache invalidation happens automatically based on timeout.
-    """
-
     def __init__(self, cache_prefix: str):
         """
         Configurable statistics service.
@@ -156,5 +150,6 @@ class CourseStatistics:
         delete_cache_with_prefix(build_cache_key(self.CACHE_KEY_PREFIX))
 
 
-# Default singleton-like instance for general use
+# Default singleton-like instance for course-related statistics
 course_stats = CourseStatistics('course_stats')
+
