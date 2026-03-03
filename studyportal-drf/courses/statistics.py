@@ -31,15 +31,20 @@ class CourseStatistics:
     Cache invalidation happens automatically based on timeout.
     """
 
-    CACHE_KEY_PREFIX = 'course_stats'
+    def __init__(self, cache_prefix: str):
+        """
+        Configurable statistics service.
 
-    @classmethod
-    def _get_cache_key(cls, stat_type, **kwargs):
+        Args:
+            cache_prefix: Base prefix used for all statistics cache keys.
+        """
+        self.CACHE_KEY_PREFIX = cache_prefix
+
+    def _get_cache_key(self, stat_type, **kwargs):
         """Generate unique cache key based on stat type and parameters."""
-        return build_cache_key(cls.CACHE_KEY_PREFIX, stat=stat_type, **kwargs)
+        return build_cache_key(self.CACHE_KEY_PREFIX, stat=stat_type, **kwargs)
 
-    @classmethod
-    def get_average_enrollments(cls, time_period=None):
+    def get_average_enrollments(self, time_period=None):
         """
         Calculate average number of enrollments per course.
         Result is cached for STATISTICS_CACHE_TIMEOUT seconds.
@@ -55,7 +60,7 @@ class CourseStatistics:
                 'total_enrollments': int
             }
         """
-        cache_key = cls._get_cache_key('avg_enrollments', days=time_period)
+        cache_key = self._get_cache_key('avg_enrollments', days=time_period)
 
         def compute():
             queryset = Course.objects.filter(is_active=True)
@@ -82,8 +87,7 @@ class CourseStatistics:
 
         return cache_get_or_set(cache_key, compute, timeout=get_statistics_cache_timeout())
 
-    @classmethod
-    def get_top_courses(cls, limit=10, time_period=None):
+    def get_top_courses(self, limit=10, time_period=None):
         """
         Get courses with the most enrollments.
         Result is cached for STATISTICS_CACHE_TIMEOUT seconds.
@@ -95,7 +99,7 @@ class CourseStatistics:
         Returns:
             list: List of Course objects annotated with enrollment_count
         """
-        cache_key = cls._get_cache_key('top_courses', limit=limit, days=time_period)
+        cache_key = self._get_cache_key('top_courses', limit=limit, days=time_period)
 
         def compute():
             queryset = Course.objects.filter(is_active=True)
@@ -114,8 +118,7 @@ class CourseStatistics:
 
         return cache_get_or_set(cache_key, compute, timeout=get_statistics_cache_timeout())
 
-    @classmethod
-    def get_enrollment_trends(cls, days=30):
+    def get_enrollment_trends(self, days=30):
         """
         Get daily enrollment counts for trend analysis.
         Result is cached for STATISTICS_CACHE_TIMEOUT seconds.
@@ -126,7 +129,7 @@ class CourseStatistics:
         Returns:
             list: [{date, count}, ...] for the last N days
         """
-        cache_key = cls._get_cache_key('enrollment_trends', days=days)
+        cache_key = self._get_cache_key('enrollment_trends', days=days)
 
         def compute():
             from django.db.models.functions import TruncDate
@@ -145,10 +148,13 @@ class CourseStatistics:
 
         return cache_get_or_set(cache_key, compute, timeout=get_statistics_cache_timeout())
 
-    @classmethod
-    def clear_all_cache(cls):
+    def clear_all_cache(self):
         """
         Manually clear all statistics cache.
         Useful when you want to force recalculation (e.g., after bulk updates).
         """
-        delete_cache_with_prefix(build_cache_key(cls.CACHE_KEY_PREFIX))
+        delete_cache_with_prefix(build_cache_key(self.CACHE_KEY_PREFIX))
+
+
+# Default singleton-like instance for general use
+course_stats = CourseStatistics('course_stats')

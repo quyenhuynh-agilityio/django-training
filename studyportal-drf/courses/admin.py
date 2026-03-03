@@ -10,7 +10,7 @@ from utils.admin.badges import status_badge
 from utils.admin.display import admin_link
 
 from .models import Course
-from .statistics import CourseStatistics
+from .statistics import course_stats
 
 
 class EnrollmentInline(admin.TabularInline):
@@ -240,7 +240,7 @@ class CourseAdmin(admin.ModelAdmin):
 
     @admin.display(description=_('Average Enrollment'))
     def display_average_enrollment(self, obj):
-        stats = CourseStatistics.get_average_enrollments()
+        stats = course_stats.get_average_enrollments()
         return format_html(
             '{:.2f} avg ({} courses, {} enrollments)',
             stats['average'],
@@ -250,7 +250,7 @@ class CourseAdmin(admin.ModelAdmin):
 
     @admin.display(description=_('Top 5 Courses'))
     def display_top_courses(self, obj):
-        top_courses = CourseStatistics.get_top_courses(limit=5)
+        top_courses = course_stats.get_top_courses(limit=5)
         if not top_courses:
             return '—'
 
