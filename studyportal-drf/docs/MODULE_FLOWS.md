@@ -140,7 +140,13 @@ Endpoints and steps:
 - `POST /api/v1/users/auth/register/`
   1. Validate with `UserRegistrationSerializer`.
   2. Create user.
-  3. Return 201 + user data.
+  3. Send verification email (async).
+  4. Return 201 + user data.
+
+- `POST /api/v1/users/auth/verify-email/`
+  1. Validate token from verification email.
+  2. Set `email_verified_at`, clear token, set `is_active=True`.
+  3. Save user → **post_save signal** sends welcome email and triggers auto-enroll (see 3.4).
 
 - `POST /api/v1/users/auth/login/`
   1. Validate credentials.
@@ -173,6 +179,20 @@ Endpoints and steps:
 
 Why ViewSet actions:
 - Authentication is not a CRUD resource; actions map better to auth use cases.
+
+### 3.4 User signals (enrollment deactivation)
+File: `users/signals.py`
+
+Currently user signals are only responsible for **deactivating enrollments** when a user account is disabled:
+
+- `post_save` on `User`: when `is_active` becomes `False`, all active enrollments for that user are marked inactive.
+
+Why this lives in a signal:
+
+- This rule must apply no matter **where** the user is disabled (API, admin, scripts).
+- Keeping it at the model/signal layer ensures enrollments are always cleaned up consistently.
+
+Welcome email and auto-enrollment are now triggered **directly** in the `verify-email` API action instead of via a signal, so those side‑effects stay local to that request flow.
 
 ## 4) Categories Module (Public catalog)
 ### 4.1 Model

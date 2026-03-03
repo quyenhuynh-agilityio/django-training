@@ -1,6 +1,7 @@
 import pytest
-from rest_framework_simplejwt.tokens import RefreshToken
+from unittest.mock import patch
 
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.test import override_settings
 from rest_framework import status
 
@@ -84,3 +85,59 @@ def test_auth_password_reset_exposes_debug_tokens_when_enabled(api_client, creat
     assert debug is not None
     assert set(debug.keys()) == {'uid', 'token', 'reset_link'}
     assert '/reset-password/' in debug['reset_link']
+
+
+def test_auth_verify_email_triggers_welcome_and_auto_enroll_for_student(
+    api_client, create_user
+):
+    """Verify-email should send welcome email and auto-enroll students."""
+    user = create_user(
+        email='student@example.com',
+        username='verify-student',
+        role='student',
+        is_active=False,
+    )
+    token = user.generate_verification_token()
+    user.save()
+
+    with patch('users.api.views.send_welcome_email') as mock_welcome, patch(
+        'users.api.views.auto_enroll_intro_courses'
+    ) as mock_auto_enroll:
+        response = api_client.post(
+            '/api/v1/auth/verify-email/',
+            {'user_id': str(user.id), 'token': token},
+            format='json',
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data['message']
+
+    mock_welcome.delay.assert_called_once_with(user_id=str(user.id))
+    mock_auto_enroll.delay.assert_called_once_with(user_id=str(user.id))
+
+
+def test_auth_verify_email_triggers_only_welcome_for_instructor(api_client, create_user):
+    """Verify-email should not auto-enroll non-students (e.g., instructors)."""
+    user = create_user(
+        email='instructor@example.com',
+        username='verify-instructor',
+        role='instructor',
+        is_active=False,
+    )
+    token = user.generate_verification_token()
+    user.save()
+
+    with patch('users.api.views.send_welcome_email') as mock_welcome, patch(
+        'users.api.views.auto_enroll_intro_courses'
+    ) as mock_auto_enroll:
+        response = api_client.post(
+            '/api/v1/auth/verify-email/',
+            {'user_id': str(user.id), 'token': token},
+            format='json',
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data['message']
+
+    mock_welcome.delay.assert_called_once_with(user_id=str(user.id))
+    mock_auto_enroll.delay.assert_not_called()

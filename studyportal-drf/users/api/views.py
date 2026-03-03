@@ -31,9 +31,11 @@ from core.texts import ErrorMessage, SuccessMessage
 
 # Import Celery tasks
 from users.tasks import (
+    auto_enroll_intro_courses,
     send_password_reset_confirmation_email,
     send_password_reset_email,
     send_verification_email,
+    send_welcome_email,
 )
 
 from .serializers import (
@@ -200,9 +202,13 @@ class AuthViewSet(CommonViewSet):
         user = serializer.validated_data['user']
 
         # Verify email (activates account and clears token)
-        # This will trigger post_save signal which sends welcome email
-        # and auto-enrolls students in intro courses
         user.verify_email()
+
+        # After successful verification, trigger welcome email + auto-enrollment explicitly.
+        # This avoids relying on model signals and keeps the side-effects local to the API flow.
+        send_welcome_email.delay(user_id=str(user.id))
+        if user.is_student:
+            auto_enroll_intro_courses.delay(user_id=str(user.id))
 
         return self.ok({'message': SuccessMessage.EMAIL_VERIFIED_SUCCESS})
 

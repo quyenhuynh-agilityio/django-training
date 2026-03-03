@@ -358,7 +358,7 @@ studyportal-drf/
 │   │   └── urls.py          # API routes
 │   ├── models.py            # Custom User model (email login, roles)
 │   ├── admin.py             # Admin interface for user management
-│   └── signals.py           # User signals (deactivate enrollments)
+│   └── signals.py           # User signals (deactivate enrollments when user is disabled)
 │
 ├── courses/                  # Course management
 │   ├── api/

@@ -1,8 +1,8 @@
 """
-Small Sentry helper wrappers.
+Small Sentry helper wrappers (SDK 2.x+).
 
 Goal:
-- Centralize common "push scope + tags/context + capture" patterns
+- Centralize common "new scope + tags/context + capture" patterns
 - Make it easy to add consistent context across tasks/views/signals
 """
 
@@ -50,9 +50,10 @@ def sentry_scope(
     user: Mapping[str, object] | None = None,
 ) -> Iterator[object]:
     """
-    Context manager that pushes a Sentry scope and enriches it.
+    Context manager that creates a new Sentry scope and enriches it.
+    Uses new_scope() (SDK 2.x+) so tags/context/user do not leak outside the block.
     """
-    with sentry_sdk.push_scope() as scope:
+    with sentry_sdk.new_scope() as scope:
         _set_tags(scope, tags)
         _set_contexts(scope, contexts)
         _set_user(scope, user)
