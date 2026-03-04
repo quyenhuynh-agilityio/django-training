@@ -168,13 +168,16 @@ def send_welcome_email(self, user_id):
     """
     user = _get_user_by_id(user_id, error_context='welcome email')
 
+    base_url = (getattr(settings, 'FRONTEND_URL', '') or 'http://localhost:3000').rstrip('/')
+    dashboard_url = f'{base_url}/dashboard'
+
     _send_email_with_context(
         user=user,
         subject=EmailSubject.WELCOME,
         template_name='emails/welcome_email.html',
         context={
             'user': user,
-            'dashboard_url': f'{settings.FRONTEND_URL}/dashboard',
+            'dashboard_url': dashboard_url,
         },
         sentry_tag='send_welcome_email',
         log_message='Welcome email sent to {email}',

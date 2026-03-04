@@ -215,7 +215,14 @@ uv run python manage.py migrate
 uv run python manage.py createsuperuser
 ```
 
-6. **Start development server**
+6. **Seed sample data (optional)**  
+   Creates categories, instructor, students, courses, and enrollments so you can try the API and admin.
+```bash
+uv run python manage.py seed_data
+```
+   To remove seed data and re-seed: `uv run python manage.py seed_data --clear` then `uv run python manage.py seed_data` again.
+
+7. **Start development server**
 ```bash
 uv run python manage.py runserver
 ```
