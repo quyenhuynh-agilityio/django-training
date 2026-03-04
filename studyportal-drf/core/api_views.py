@@ -1,8 +1,7 @@
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-
-from utils.permissions import permissions_for_action
 
 
 class CommonViewSet(GenericViewSet):
@@ -19,11 +18,10 @@ class CommonViewSet(GenericViewSet):
         """
         permission_classes_map = getattr(self, 'permission_classes_map', None)
         if permission_classes_map is not None:
-            return permissions_for_action(
-                action=self.action,
-                permission_classes_map=permission_classes_map,
-                default_permissions=self.permission_classes,
-            )
+            # Mirror utils.permissions.permissions_for_action behavior inline
+            default_permissions = self.permission_classes or [AllowAny]
+            permission_classes = permission_classes_map.get(self.action, default_permissions)
+            return [permission() for permission in permission_classes]
         return [permission() for permission in self.permission_classes]
 
     def ok(self, data: dict | None = None) -> Response:
