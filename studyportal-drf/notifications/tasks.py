@@ -30,6 +30,12 @@ def create_student_enrolled_notification(
     """
     Async task to create student enrollment notification for instructor.
 
+    - If Notification.objects.create() succeeds but cache.delete() raises, the task
+      still succeeds: cache invalidation is best-effort (logged, not re-raised) to
+      avoid Celery retries and duplicate notifications.
+    - Sentry: scope is set once in sentry_scope(); on exception we call
+      sentry_capture_exception(e) only (no duplicate tags/contexts).
+
     Args:
         instructor_id: UUID of instructor
         student_id: UUID of student
@@ -39,24 +45,24 @@ def create_student_enrolled_notification(
         course_code: Course code
         course_title: Course title
     """
-    try:
-        logger.info(
-            f'Creating enrollment notification for instructor {instructor_id} '
-            f'about student {student_email} in course {course_code}'
-        )
+    logger.info(
+        f'Creating enrollment notification for instructor {instructor_id} '
+        f'about student {student_email} in course {course_code}'
+    )
 
-        with sentry_scope(
-            tags={'task_name': 'create_student_enrolled_notification', 'module': 'notifications'},
-            contexts={
-                'task_data': {
-                    'instructor_id': str(instructor_id),
-                    'student_id': str(student_id),
-                    'student_email': student_email,
-                    'course_id': str(course_id),
-                    'course_code': course_code,
-                }
-            },
-        ):
+    with sentry_scope(
+        tags={'task_name': 'create_student_enrolled_notification', 'module': 'notifications'},
+        contexts={
+            'task_data': {
+                'instructor_id': str(instructor_id),
+                'student_id': str(student_id),
+                'student_email': student_email,
+                'course_id': str(course_id),
+                'course_code': course_code,
+            }
+        },
+    ):
+        try:
             notification = Notification.objects.create(
                 recipient_id=instructor_id,
                 type=NotificationType.STUDENT_ENROLLED,
@@ -71,28 +77,23 @@ def create_student_enrolled_notification(
                 },
             )
 
-        # Invalidate instructor's unread count cache
-        cache.delete(build_cache_key('notification_unread_count', user_id=instructor_id))
+            # Best-effort: invalidate instructor's unread count cache (do not fail task on cache error)
+            try:
+                cache.delete(build_cache_key('notification_unread_count', user_id=instructor_id))
+            except Exception as cache_err:
+                logger.warning(
+                    'Failed to invalidate notification cache after create: %s',
+                    cache_err,
+                    extra={'instructor_id': str(instructor_id)},
+                )
 
-        logger.info(f'Created notification {notification.id}')
-        return {'status': 'success', 'notification_id': str(notification.id)}
+            logger.info(f'Created notification {notification.id}')
+            return {'status': 'success', 'notification_id': str(notification.id)}
 
-    except Exception as e:
-        logger.error(f'Failed to create enrollment notification: {e}', exc_info=True)
-        sentry_capture_exception(
-            e,
-            tags={'task_name': 'create_student_enrolled_notification', 'module': 'notifications'},
-            contexts={
-                'task_data': {
-                    'instructor_id': str(instructor_id),
-                    'student_id': str(student_id),
-                    'student_email': student_email,
-                    'course_id': str(course_id),
-                    'course_code': course_code,
-                }
-            },
-        )
-        raise
+        except Exception as e:
+            logger.error(f'Failed to create enrollment notification: {e}', exc_info=True)
+            sentry_capture_exception(e)
+            raise
 
 
 @shared_task(
@@ -113,6 +114,9 @@ def create_student_removed_notification(
     """
     Async task to create student removal notification.
 
+    - Cache invalidation after create is best-effort; Sentry scope is set once,
+      and sentry_capture_exception(e) is called without duplicating tags/contexts.
+
     Args:
         student_id: UUID of student
         course_id: UUID of course
@@ -121,22 +125,22 @@ def create_student_removed_notification(
         removed_by_id: UUID of user who removed (optional)
         removed_by_name: Name of user who removed (optional)
     """
-    try:
-        logger.info(
-            f'Creating removal notification for student {student_id} from course {course_code}'
-        )
+    logger.info(
+        f'Creating removal notification for student {student_id} from course {course_code}'
+    )
 
-        with sentry_scope(
-            tags={'task_name': 'create_student_removed_notification', 'module': 'notifications'},
-            contexts={
-                'task_data': {
-                    'student_id': str(student_id),
-                    'course_id': str(course_id),
-                    'course_code': course_code,
-                    'removed_by_id': str(removed_by_id) if removed_by_id else None,
-                }
-            },
-        ):
+    with sentry_scope(
+        tags={'task_name': 'create_student_removed_notification', 'module': 'notifications'},
+        contexts={
+            'task_data': {
+                'student_id': str(student_id),
+                'course_id': str(course_id),
+                'course_code': course_code,
+                'removed_by_id': str(removed_by_id) if removed_by_id else None,
+            }
+        },
+    ):
+        try:
             message = f'You have been removed from {course_title}'
             if removed_by_name:
                 message += f' by {removed_by_name}'
@@ -154,24 +158,20 @@ def create_student_removed_notification(
                 },
             )
 
-        # Invalidate student's unread count cache
-        cache.delete(build_cache_key('notification_unread_count', user_id=student_id))
+            # Best-effort: invalidate student's unread count cache (do not fail task on cache error)
+            try:
+                cache.delete(build_cache_key('notification_unread_count', user_id=student_id))
+            except Exception as cache_err:
+                logger.warning(
+                    'Failed to invalidate notification cache after create: %s',
+                    cache_err,
+                    extra={'student_id': str(student_id)},
+                )
 
-        logger.info(f'Created notification {notification.id}')
-        return {'status': 'success', 'notification_id': str(notification.id)}
+            logger.info(f'Created notification {notification.id}')
+            return {'status': 'success', 'notification_id': str(notification.id)}
 
-    except Exception as e:
-        logger.error(f'Failed to create removal notification: {e}', exc_info=True)
-        sentry_capture_exception(
-            e,
-            tags={'task_name': 'create_student_removed_notification', 'module': 'notifications'},
-            contexts={
-                'task_data': {
-                    'student_id': str(student_id),
-                    'course_id': str(course_id),
-                    'course_code': course_code,
-                    'removed_by_id': str(removed_by_id) if removed_by_id else None,
-                }
-            },
-        )
-        raise
+        except Exception as e:
+            logger.error(f'Failed to create removal notification: {e}', exc_info=True)
+            sentry_capture_exception(e)
+            raise

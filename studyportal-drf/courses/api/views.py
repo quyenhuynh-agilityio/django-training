@@ -34,7 +34,6 @@ from core.permissions import IsCourseInstructor, IsInstructor
 from core.texts import ErrorMessage, SuccessMessage
 from courses.models import Course
 from enrollments.models import Enrollment
-from utils.permissions import permissions_for_action
 
 from .filters import CourseFilter
 from .serializers import (
@@ -553,14 +552,6 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         'destroy': [IsCourseInstructor],
         'enrolled_students': [IsCourseInstructor],
     }
-
-    def get_permissions(self):
-        """Get permissions based on action"""
-        return permissions_for_action(
-            action=self.action,
-            permission_classes_map=self.permission_classes_map,
-            default_permissions=self.permission_classes,
-        )
 
     def get_serializer_class(self):
         """Return serializer based on action"""

@@ -34,6 +34,20 @@ REST_FRAMEWORK = {
 }
 
 # ==============================
+# CACHE & SESSION - No Redis required locally
+# ==============================
+# Use in-memory cache and DB sessions so the app works without Redis.
+# Start Redis when you need Celery workers or Redis cache.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'KEY_PREFIX': 'studyportal',
+        'TIMEOUT': 300,
+    }
+}
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# ==============================
 # CORS - Allow All Origins
 # ==============================
 # In development, allow all origins for easier testing

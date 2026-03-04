@@ -2,15 +2,37 @@ import secrets
 import uuid
 from datetime import timedelta
 
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as BaseUserManager
 from django.db import models
 from django.utils import timezone
 
 from core.choices import UserRole
 from core.texts import HelpText
 
+
 # ═══════════════════════════════════════════════════════════════
-# MANAGER FOR COMMON QUERIES
+# USER MANAGER (superuser: active + verified, no emails)
+# ═══════════════════════════════════════════════════════════════
+
+
+class UserManager(BaseUserManager):
+    """Custom manager so superusers are created active and verified, no verification/welcome emails."""
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('role', UserRole.ADMIN)
+        extra_fields.setdefault('email_verified_at', timezone.now())
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        return self._create_user(username, email, password, **extra_fields)
+
+
+# ═══════════════════════════════════════════════════════════════
+# USER MODEL
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -91,6 +113,8 @@ class User(AbstractUser):
     # ─── Authentication Settings ────────────────────────────────
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+
+    objects = UserManager()
 
     class Meta:
         db_table = 'users'
