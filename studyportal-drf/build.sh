@@ -29,3 +29,12 @@ else:
 else
     echo "Conditional superuser creation skipped."
 fi
+
+# Optional: seed database with sample data (e.g. for staging/dev; set RUN_SEED_DATA=true)
+if [ "${RUN_SEED_DATA:-false}" = "true" ]; then
+    echo "Running seed data..."
+    uv run python manage.py seed_data
+    echo "Seed data completed."
+else
+    echo "Seed data skipped (set RUN_SEED_DATA=true to run)."
+fi
