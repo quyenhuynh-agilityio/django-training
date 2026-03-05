@@ -110,3 +110,21 @@ def test_enrolled_courses_view_authenticated(client, create_user, create_course,
     course_ids = [str(course.id) for course in response.context['courses']]
     assert str(enrolled_course.id) in course_ids
     assert str(not_enrolled_course.id) not in course_ids
+
+
+def test_enroll_course_view_full_course_redirects_to_course_list(
+    client, create_user, create_course, create_enrollment
+):
+    """When course is full, enroll_course catches ValidationError and redirects to course list."""
+    student1 = create_user(email='s1@example.com', username='s1', role='student')
+    student2 = create_user(email='s2@example.com', username='s2', role='student')
+    course = create_course(course_code='FULL1', is_active=True, max_students=1)
+    create_enrollment(student=student1, course=course, is_active=True)
+
+    client.force_login(student2)
+    response = client.post(reverse('enroll_course', args=[course.id]))
+
+    assert response.status_code == 302
+    assert response.url == reverse('course_list')
+    # No second enrollment created (course full)
+    assert not Enrollment.objects.filter(student=student2, course=course).exists()

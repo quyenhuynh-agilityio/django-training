@@ -5,8 +5,9 @@ from celery import shared_task
 from django.core.cache import cache
 
 from core.cache import build_cache_key
+from core.choices import NotificationType
 from core.sentry import sentry_capture_exception, sentry_scope
-from notifications.models import Notification, NotificationType
+from notifications.models import Notification
 
 logger = logging.getLogger(__name__)
 

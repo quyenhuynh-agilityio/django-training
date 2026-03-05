@@ -1,4 +1,40 @@
+from rest_framework.permissions import IsAuthenticated
+
 from core.api_views import CommonViewSet
+
+
+def test_get_permissions_uses_map_when_defined():
+    """When permission_classes_map is set, get_permissions returns action-based permissions."""
+    class ViewSet(CommonViewSet):
+        permission_classes = [IsAuthenticated]
+        permission_classes_map = {
+            'list': [],
+            'create': [IsAuthenticated],
+        }
+
+    viewset = ViewSet()
+    viewset.action = 'list'
+    perms = viewset.get_permissions()
+    assert len(perms) == 0
+
+    viewset.action = 'create'
+    perms = viewset.get_permissions()
+    assert len(perms) == 1
+
+    viewset.action = 'unknown'
+    perms = viewset.get_permissions()
+    assert len(perms) == 1  # fallback to permission_classes
+
+
+def test_get_permissions_fallback_when_no_map():
+    """When permission_classes_map is not set, use permission_classes."""
+    class ViewSet(CommonViewSet):
+        permission_classes = [IsAuthenticated]
+
+    viewset = ViewSet()
+    viewset.action = 'list'
+    perms = viewset.get_permissions()
+    assert len(perms) == 1
 
 
 def test_ok_defaults():

@@ -112,6 +112,37 @@ def create_enrollment(create_user, create_course):
     return _create_enrollment
 
 
+@pytest.fixture
+def create_notification(create_user):
+    """Factory to create notifications."""
+
+    def _create_notification(
+        recipient=None,
+        notification_type=None,
+        payload=None,
+        is_read=False,
+        **extra,
+    ):
+        from core.choices import NotificationType
+        from notifications.models import Notification
+
+        recipient = recipient or create_user(
+            email=f'recipient-{uuid.uuid4().hex[:6]}@example.com',
+            username=f'recipient-{uuid.uuid4().hex[:6]}',
+        )
+        notification_type = notification_type or NotificationType.STUDENT_ENROLLED
+        payload = payload or {'message': 'Test notification'}
+        return Notification.objects.create(
+            recipient=recipient,
+            type=notification_type,
+            payload=payload,
+            is_read=is_read,
+            **extra,
+        )
+
+    return _create_notification
+
+
 # ============================================================================
 # Factory Boy Fixtures
 # ============================================================================

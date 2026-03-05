@@ -808,9 +808,9 @@ class CourseViewSet(CommonViewSet, viewsets.ModelViewSet):
         # Perform soft delete
         course.soft_delete()
 
-        # Prepare response data
+        # Prepare response data (str() for lazy translation so serializer accepts it)
         response_data = {
-            'message': SuccessMessage.COURSE_DELETED_SUCCESSFULLY,
+            'message': str(SuccessMessage.COURSE_DELETED_SUCCESSFULLY),
             'course_id': str(course.id),
             'course_code': course.course_code,
         }

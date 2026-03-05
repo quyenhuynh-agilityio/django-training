@@ -116,4 +116,3 @@ class TestSendMonthlyEnrollmentReport:
 
         # Should still report success for the ones that worked
         assert result['status'] == 'success'
-

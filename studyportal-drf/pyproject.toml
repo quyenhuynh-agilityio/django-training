@@ -95,6 +95,7 @@ omit = [
     "*/__init__.py",
     "*/apps.py",
     "*/admin.py",
+    "core/management/commands/seed_data.py",
     "config/wsgi.py",
     "config/asgi.py",
     "manage.py",
